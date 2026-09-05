@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/backend/">
+    <Project Path="backend/PadelMatch.Api/PadelMatch.Api.csproj" />
+    <Project Path="backend/PadelMatch.Application/PadelMatch.Application.csproj" />
+    <Project Path="backend/PadelMatch.Domain/PadelMatch.Domain.csproj" />
+    <Project Path="backend/PadelMatch.Infrastructure/PadelMatch.Infrastructure.csproj" />
+    <Project Path="backend/PadelMatch.Api.Tests/PadelMatch.Api.Tests.csproj" />
+  </Folder>
+</Solution>

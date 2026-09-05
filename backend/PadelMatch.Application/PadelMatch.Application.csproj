@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../PadelMatch.Domain/PadelMatch.Domain.csproj" />
+  </ItemGroup>
+</Project>

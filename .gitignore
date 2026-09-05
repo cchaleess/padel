@@ -1,2 +1,26 @@
 # Memoria y estado local de Pastiche.
 .pastiche/
+
+# Herramientas, bases de datos y evidencia de ejecución locales.
+.local/
+artifacts/
+
+# .NET
+**/bin/
+**/obj/
+**/TestResults/
+.vs/
+*.user
+
+# Expo / Node
+**/node_modules/
+**/.expo/
+**/dist/
+mobile/android/
+mobile/ios/
+
+# Configuración privada
+.env
+.env.*
+!.env.example
+*.log

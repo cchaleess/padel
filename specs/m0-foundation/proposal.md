@@ -54,7 +54,7 @@ Estos criterios describen cómo reconocer que M0 está terminado cuando se imple
 
 ## Aclaraciones y ambigüedades del plan
 
-Las aclaraciones A1–A3 quedan resueltas para esta revisión mediante las respuestas recogidas a continuación. Las políticas de gestión de pista pertenecen a una capa de clubes todavía por definir; su detalle se difiere expresamente a esa spec. Resolver estas aclaraciones no sustituye la revisión final de constitution y proposal solicitada por el usuario: no se avanza todavía a `design.md` ni a `tasks.md`.
+Las aclaraciones A1–A3 quedan resueltas mediante las respuestas recogidas a continuación. Las políticas de gestión de pista pertenecen a una capa de clubes todavía por definir; su detalle se difiere expresamente a esa spec. Tras esta revisión y la conexión del repositorio remoto, el usuario indicó continuar con M0, autorizando la preparación del diseño, las tareas y la implementación.
 
 ### A1. ¿El organizador ocupa una plaza automáticamente al crear el partido?
 
@@ -110,4 +110,4 @@ Las decisiones temporales de esta revisión quedan resueltas. Afectan a los futu
 
 Tras la revisión final de este proposal y la constitución por el usuario, el diseño concretará las versiones del stack, las dependencias entre proyectos, la configuración local de PostgreSQL, el punto de partida de EF Core y migraciones, los tipos de fecha acordes con la política temporal, la exposición de OpenAPI y la comprobación mínima de la aplicación móvil. Las políticas de clubes expresamente diferidas se definirán en su propia spec, fuera de M0.
 
-Este documento define intención, alcance y resultados verificables. La siguiente etapa queda pendiente de la revisión del usuario; no se incluyen todavía diseño técnico, checklist de implementación ni código.
+Este documento define intención, alcance y resultados verificables. El enfoque técnico y la ejecución se desarrollan en [design.md](design.md) y [tasks.md](tasks.md).
