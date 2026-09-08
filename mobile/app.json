@@ -6,7 +6,19 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "backgroundColor": "#F5F4EE",
-    "ios": { "supportsTablet": false },
-    "web": { "bundler": "metro" }
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.padelmatch.app"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "@react-native-google-signin/google-signin",
+      "expo-secure-store",
+      "@react-native-community/datetimepicker"
+    ]
   }
 }

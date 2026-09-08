@@ -128,6 +128,39 @@ npm --prefix mobile run export   # Genera bundles Android, iOS y web en mobile/d
 
 Windows permite trabajar con Expo Go en un iPhone físico, pero no ejecutar iOS Simulator. Exportar bundles nativos comprueba el código JavaScript; no acredita ejecución en dispositivo ni genera por sí solo un APK/IPA.
 
+### Login de Google (M1, development build de Android)
+
+Expo Go **no sirve** para probar el login de Google: no soporta esquemas de URL personalizados y el SDK nativo (`@react-native-google-signin/google-signin`) exige un development build (ver [specs/m1-mobile-auth/design.md](specs/m1-mobile-auth/design.md)). Este flujo usa en su lugar un development build local de Android, sin EAS ni Mac.
+
+Prerrequisitos adicionales:
+- Android SDK Platform Tools (`adb`) y, para compilar, `platforms;android-36.1` + `build-tools;36.1.0` (o versiones equivalentes) — no hace falta instalar Android Studio completo.
+- Un dispositivo Android físico con depuración USB activada, o un emulador (AVD) si prefieres usar Android Studio.
+- Un cliente OAuth de tipo **Android** en el mismo proyecto de Google Cloud del Web Client ID ya usado por la API (paquete `com.padelmatch.app` + huella SHA-1 del keystore de depuración — obtenla con `cd mobile/android && ./gradlew signingReport` tras el primer `npx expo prebuild --platform android`).
+
+Configuración:
+
+```powershell
+Copy-Item mobile/.env.example mobile/.env
+# Rellena en mobile/.env:
+#   EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID = el mismo Web Client ID que Auth:Google:Audience
+#   EXPO_PUBLIC_API_BASE_URL = http://10.0.2.2:5080 (emulador) o http://<IP-LAN-del-PC>:5080 (dispositivo físico)
+```
+
+Para que la API sea accesible desde el dispositivo/emulador, arráncala escuchando en todas las interfaces (y permite el puerto 5080 en el Firewall de Windows si te lo pide la primera vez):
+
+```powershell
+$env:ASPNETCORE_ENVIRONMENT = 'Development'
+dotnet run --project backend/PadelMatch.Api --launch-profile http --urls http://0.0.0.0:5080
+```
+
+Con el dispositivo conectado (`adb devices` debe listarlo):
+
+```powershell
+npx expo run:android --prefix mobile
+```
+
+Este comando compila e instala el development build; las siguientes veces basta con `npm --prefix mobile start` y reabrir la app instalada (usa Metro igual que Expo Go).
+
 ## Verificación
 
 Con PostgreSQL arrancado:
