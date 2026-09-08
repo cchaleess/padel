@@ -1,8 +1,8 @@
 # PadelMatch
 
-Base del MVP de una aplicación móvil para organizar partidos de pádel. M0 incorpora la solución .NET, PostgreSQL/EF Core, migraciones, OpenAPI y una pantalla inicial Expo. Los flujos de jugadores y partidos se implementan en milestones posteriores.
+Base del MVP de una aplicación móvil para organizar partidos de pádel. M0 incorpora la solución .NET, PostgreSQL/EF Core, migraciones, OpenAPI y una pantalla inicial Expo. M1 añade `Player`: login social con Google y Apple, perfil propio y la encuesta de nivel inicial. Los flujos de partidos y clubes se implementan en milestones posteriores.
 
-El alcance y las decisiones están en [la constitución](specs/CONSTITUTION.md), [el proposal](specs/m0-foundation/proposal.md), [el diseño](specs/m0-foundation/design.md) y [las tareas de M0](specs/m0-foundation/tasks.md).
+El alcance y las decisiones están en [la constitución](specs/CONSTITUTION.md), y en las specs de cada milestone: [M0](specs/m0-foundation/proposal.md) ([diseño](specs/m0-foundation/design.md), [tareas](specs/m0-foundation/tasks.md)) y [M1](specs/m1-players/proposal.md) ([diseño](specs/m1-players/design.md), [tareas](specs/m1-players/tasks.md)).
 
 ## Prerrequisitos
 
@@ -71,7 +71,7 @@ Invoke-RestMethod http://localhost:5080/openapi/v1.json
 
 `/health/live` comprueba el proceso. `/health/ready` devuelve 200 cuando PostgreSQL es accesible y las migraciones están aplicadas, y 503 si falta la base o alguna migración. OpenAPI se publica solo en Development; puede abrirse directamente en un navegador o importarse en un cliente HTTP.
 
-La migración `InitialFoundation` no crea tablas de negocio: establece `__EFMigrationsHistory` como punto de partida. Repetir `database update` sin cambios no añade otra entrada. La API no aplica migraciones automáticamente.
+La migración `InitialFoundation` no crea tablas de negocio: establece `__EFMigrationsHistory` como punto de partida. `AddPlayers` (M1) crea `Players` y `PlayerExternalIdentities`, con índice único en `(Provider, ProviderSubjectId)`. Repetir `database update` sin cambios no añade otra entrada. La API no aplica migraciones automáticamente.
 
 Para una futura modificación real del modelo:
 
@@ -88,6 +88,24 @@ $env:ConnectionStrings__PadelMatch = 'Host=localhost;Port=5433;Database=padelmat
 ```
 
 Fuera de Development es obligatorio proporcionar la conexión. No guardes credenciales reales en archivos versionados. El reloj del servidor y los instantes UTC rigen los plazos; la zona prevista de presentación es `Europe/Madrid`.
+
+## Autenticación (M1)
+
+El login es social: Google (Android/iOS) y Apple (iOS). La API no delega la sesión al proveedor: verifica el ID token que entrega el SDK nativo y emite su propio JWT (HMAC, 30 días) para el resto de llamadas. Requiere tres valores de configuración, con el mismo tratamiento que `ConnectionStrings__PadelMatch`: valor de desarrollo en `appsettings.Development.json`, obligatorios fuera de Development.
+
+| Configuración | Significado |
+| --- | --- |
+| `Auth:Google:Audience` | Web Client ID de PadelMatch en Google Cloud Console (mismo id configurado como `serverClientId`/`webClientId` en el cliente móvil, en Android e iOS). |
+| `Auth:Apple:Audience` | Bundle identifier de la app iOS. |
+| `Auth:SessionSigningKey` | Clave simétrica con la que la API firma sus propios JWT de sesión. |
+
+`appsettings.Development.json` trae valores de ejemplo; `Auth:Google:Audience` y `Auth:Apple:Audience` son placeholders (`REPLACE_WITH_...`) porque dependen de cuentas de Google Cloud/Apple Developer propias del proyecto — sustitúyelos por los reales para probar el login social de verdad. `Auth:SessionSigningKey` sí trae un valor local utilizable. Fuera de Development:
+
+```powershell
+$env:Auth__Google__Audience = 'TU_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com'
+$env:Auth__Apple__Audience = 'com.tuempresa.padelmatch'
+$env:Auth__SessionSigningKey = 'TU_CLAVE_DE_FIRMA'
+```
 
 ## Cliente Expo
 
@@ -132,17 +150,18 @@ Las pruebas backend usan PostgreSQL real. Crean bases temporales `padelmatch_tes
 $env:PADELMATCH_TEST_CONNECTION = 'Host=localhost;Port=5433;Database=postgres;Username=padelmatch;Password=TU_PASSWORD;Timeout=5'
 ```
 
-Se verifica migración repetible, readiness antes/después de migrar, indisponibilidad de base, liveness independiente y contrato OpenAPI. Consulta el [informe RDD generado](specs/m0-foundation/verification.md) y las [notas de revisión con evidencia visual y limitaciones](specs/m0-foundation/review-notes.md).
+Se verifica migración repetible, readiness antes/después de migrar, indisponibilidad de base, liveness independiente y contrato OpenAPI (M0), y alta/reconocimiento de `Player` por proveedor, no fusión de cuentas entre proveedores con el mismo email, autorización 401/200 de `/api/players/me*` y el cálculo de la encuesta de nivel (M1). Las pruebas de `PadelMatch.Api.Tests` sustituyen `IExternalIdentityVerifier` por un doble determinista (`FakeExternalIdentityVerifier`): no llaman a Google/Apple reales. `PadelMatch.Domain.Tests` cubre `InitialLevelEstimator` sin necesitar PostgreSQL. Consulta el [informe RDD de M0](specs/m0-foundation/verification.md) y las [notas de revisión con evidencia visual y limitaciones](specs/m0-foundation/review-notes.md).
 
 ## Estructura
 
 ```text
 backend/
-  PadelMatch.Api/             API y composición
-  PadelMatch.Application/     Contratos de aplicación
-  PadelMatch.Domain/          Núcleo de dominio, todavía sin entidades
-  PadelMatch.Infrastructure/  EF Core, PostgreSQL y migraciones
-  PadelMatch.Api.Tests/       Pruebas de integración
+  PadelMatch.Api/             API y composición (endpoints, autenticación JWT)
+  PadelMatch.Application/     Contratos y casos de uso de aplicación
+  PadelMatch.Domain/          Núcleo de dominio (Player, InitialLevelEstimator)
+  PadelMatch.Infrastructure/  EF Core, PostgreSQL, migraciones y verificación de identidad externa
+  PadelMatch.Api.Tests/       Pruebas de integración (WebApplicationFactory + PostgreSQL real)
+  PadelMatch.Domain.Tests/    Pruebas unitarias de dominio, sin dependencias externas
 mobile/                      React Native + Expo
 scripts/                     Herramientas locales de desarrollo
 specs/                       Constitución y specs SDD
