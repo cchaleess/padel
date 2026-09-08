@@ -14,6 +14,8 @@ El producto permite descubrir, organizar y jugar partidos de pádel, y conservar
 - Contrato y documentación de API: OpenAPI/Swagger.
 - Arquitectura modular con Clean Architecture ligera.
 - La organización de referencia del plan separa `backend/` y `mobile/`; el backend distingue los proyectos `PadelMatch.Api`, `PadelMatch.Application`, `PadelMatch.Domain` y `PadelMatch.Infrastructure`.
+- Organización de `mobile/`: estructura por feature. `src/features/<dominio>/` agrupa las pantallas, componentes y hooks propios de cada dominio del plan (`auth`, `players`, `matches`, `clubs`, ...); `src/components/ui/` reúne primitivas compartidas entre features; `src/theme/` reúne los tokens de diseño compartidos. Decisión del usuario (2026-09-08): resuelve la asimetría de que la constitución ya fijaba arquitectura para el backend pero no para mobile, detectada al revisar M0. Se adopta antes de que M1 añada la primera pantalla real más allá del placeholder de M0.
+- Identidad visual / design system: mínimo viable por ahora. Los tokens de color y tipografía ya usados en la pantalla de M0 (`mobile/App.tsx`) se extraen a `src/theme/`, sin inventar una identidad nueva. Escala tipográfica completa, iconografía, catálogo de estados de componentes y accesibilidad quedan fuera de esta decisión: se resuelven pantalla a pantalla hasta que el volumen de pantallas justifique un sistema formal (§40 del plan lo trata como fase posterior). Se evaluó adoptar la herramienta externa Impeccable como mecanismo formal; no se adopta por ahora.
 
 Fuente: §3. El plan no fija versiones, convenciones detalladas de código ni herramientas de pruebas; deberán concretarse en el diseño correspondiente.
 
