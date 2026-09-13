@@ -1,0 +1,4 @@
+- `dotnet restore PadelMatch.slnx --disable-parallel`
+- `dotnet build PadelMatch.slnx -c Release --no-restore -m:1`
+- `dotnet test PadelMatch.slnx -c Release --no-build --no-restore -m:1`
+- `dotnet ef migrations has-pending-model-changes --project backend/PadelMatch.Infrastructure --startup-project backend/PadelMatch.Api --configuration Release --no-build -- --environment Development`

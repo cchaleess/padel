@@ -1,8 +1,8 @@
 # PadelMatch
 
-Base del MVP de una aplicación móvil para organizar partidos de pádel. M0 incorpora la solución .NET, PostgreSQL/EF Core, migraciones, OpenAPI y una pantalla inicial Expo. M1 añade `Player`: login social con Google y Apple, perfil propio y la encuesta de nivel inicial. Los flujos de partidos y clubes se implementan en milestones posteriores.
+Base del MVP de una aplicación móvil para organizar partidos de pádel. M0 incorpora la solución .NET, PostgreSQL/EF Core, migraciones, OpenAPI y una pantalla inicial Expo. M1 añade `Player`: login social con Google y Apple, perfil propio y la encuesta de nivel inicial (backend en `m1-players`, pantallas de mobile en `m1-mobile-auth`). M2 añade clubes y pistas de solo lectura: descubrimiento por cercanía, búsqueda, detalle y huecos disponibles, más la aportación de clubes por jugadores. La creación de partidos se implementa en milestones posteriores.
 
-El alcance y las decisiones están en [la constitución](specs/CONSTITUTION.md), y en las specs de cada milestone: [M0](specs/m0-foundation/proposal.md) ([diseño](specs/m0-foundation/design.md), [tareas](specs/m0-foundation/tasks.md)) y [M1](specs/m1-players/proposal.md) ([diseño](specs/m1-players/design.md), [tareas](specs/m1-players/tasks.md)).
+El alcance y las decisiones están en [la constitución](specs/CONSTITUTION.md), y en las specs de cada milestone: [M0](specs/m0-foundation/proposal.md) ([diseño](specs/m0-foundation/design.md), [tareas](specs/m0-foundation/tasks.md)), [M1 backend](specs/m1-players/proposal.md) ([diseño](specs/m1-players/design.md), [tareas](specs/m1-players/tasks.md)), [M1 mobile](specs/m1-mobile-auth/proposal.md) ([diseño](specs/m1-mobile-auth/design.md), [tareas](specs/m1-mobile-auth/tasks.md)) y [M2](specs/m2-clubs-courts/proposal.md) ([diseño](specs/m2-clubs-courts/design.md), [tareas](specs/m2-clubs-courts/tasks.md)).
 
 ## Prerrequisitos
 
@@ -71,7 +71,7 @@ Invoke-RestMethod http://localhost:5080/openapi/v1.json
 
 `/health/live` comprueba el proceso. `/health/ready` devuelve 200 cuando PostgreSQL es accesible y las migraciones están aplicadas, y 503 si falta la base o alguna migración. OpenAPI se publica solo en Development; puede abrirse directamente en un navegador o importarse en un cliente HTTP.
 
-La migración `InitialFoundation` no crea tablas de negocio: establece `__EFMigrationsHistory` como punto de partida. `AddPlayers` (M1) crea `Players` y `PlayerExternalIdentities`, con índice único en `(Provider, ProviderSubjectId)`. Repetir `database update` sin cambios no añade otra entrada. La API no aplica migraciones automáticamente.
+La migración `InitialFoundation` no crea tablas de negocio: establece `__EFMigrationsHistory` como punto de partida. `AddPlayers` (M1) crea `Players` y `PlayerExternalIdentities`, con índice único en `(Provider, ProviderSubjectId)`. `AddClubsAndCourts` (M2) crea `Clubs`, `Courts` y `CourtSlots`. Repetir `database update` sin cambios no añade otra entrada. La API no aplica migraciones automáticamente.
 
 Para una futura modificación real del modelo:
 
@@ -106,6 +106,24 @@ $env:Auth__Google__Audience = 'TU_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.co
 $env:Auth__Apple__Audience = 'com.tuempresa.padelmatch'
 $env:Auth__SessionSigningKey = 'TU_CLAVE_DE_FIRMA'
 ```
+
+## Clubes y pistas (M2)
+
+Catálogo de solo lectura: un jugador autenticado descubre clubes cercanos, busca por nombre, consulta el detalle de un club (con sus pistas) y los huecos de pista disponibles. También puede aportar un club nuevo (queda marcado como no verificado). No hay todavía gestión de clubes ni creación de pistas/huecos pensada para producción — ver [design.md](specs/m2-clubs-courts/design.md).
+
+```text
+GET  /api/clubs/nearby   [autenticado] ?lat?&lng?&cityOrZone?
+GET  /api/clubs/search   [autenticado] ?q
+GET  /api/clubs/{id}     [autenticado]
+GET  /api/clubs/{id}/slots [autenticado] ?from?&to?&courtId?
+POST /api/clubs          [autenticado] { name, address, cityOrZone? }
+```
+
+`GET /api/clubs/nearby` ordena por distancia (fórmula de Haversine, sin PostGIS) cuando se indican `lat`/`lng`; si no, usa `cityOrZone` (del query o, por defecto, el del perfil del jugador) como alternativa; sin ninguna señal, ordena por nombre — nunca falla por falta de ubicación. `GET /api/clubs/{id}/slots` usa una ventana de 14 días por defecto si no se indican `from`/`to`, y solo devuelve huecos `Available`.
+
+### Datos de desarrollo
+
+No hay panel de gestión de clubes en el MVP: los clubes/pistas/huecos de ejemplo se cargan mediante `DevelopmentClubSeeder`, que se ejecuta al arrancar la API solo si **ambas** condiciones se cumplen: `ASPNETCORE_ENVIRONMENT=Development` y `Development:SeedClubs=true` (ya activo en `appsettings.Development.json`). Es idempotente (no vuelve a sembrar si ya hay clubes) y **no es apto para producción** — el conjunto de datos (2 clubes oficiales con coordenadas reales, sus pistas y huecos de los próximos días) es deliberadamente mínimo y puede cambiar sin aviso. Los tests de integración desactivan explícitamente esta variable para no depender de estos datos.
 
 ## Cliente Expo
 
@@ -192,7 +210,7 @@ Las pruebas backend usan PostgreSQL real. Crean bases temporales `padelmatch_tes
 $env:PADELMATCH_TEST_CONNECTION = 'Host=localhost;Port=5433;Database=postgres;Username=padelmatch;Password=TU_PASSWORD;Timeout=5'
 ```
 
-Se verifica migración repetible, readiness antes/después de migrar, indisponibilidad de base, liveness independiente y contrato OpenAPI (M0), y alta/reconocimiento de `Player` por proveedor, no fusión de cuentas entre proveedores con el mismo email, autorización 401/200 de `/api/players/me*` y el cálculo de la encuesta de nivel (M1). Las pruebas de `PadelMatch.Api.Tests` sustituyen `IExternalIdentityVerifier` por un doble determinista (`FakeExternalIdentityVerifier`): no llaman a Google/Apple reales. `PadelMatch.Domain.Tests` cubre `InitialLevelEstimator` sin necesitar PostgreSQL. Consulta el [informe RDD de M0](specs/m0-foundation/verification.md) y las [notas de revisión con evidencia visual y limitaciones](specs/m0-foundation/review-notes.md).
+Se verifica migración repetible, readiness antes/después de migrar, indisponibilidad de base, liveness independiente y contrato OpenAPI (M0); alta/reconocimiento de `Player` por proveedor, no fusión de cuentas entre proveedores con el mismo email, autorización 401/200 de `/api/players/me*` y el cálculo de la encuesta de nivel (M1); y orden por distancia/ciudad-zona/nombre de `GET /api/clubs/nearby`, búsqueda por nombre, detalle, filtrado de huecos por rango/pista/disponibilidad y aportación de clubes por jugadores (M2). Las pruebas de `PadelMatch.Api.Tests` sustituyen `IExternalIdentityVerifier` por un doble determinista (`FakeExternalIdentityVerifier`): no llaman a Google/Apple reales; también desactivan `Development:SeedClubs` para no depender de los datos de desarrollo de M2. `PadelMatch.Domain.Tests` cubre `InitialLevelEstimator` y `HaversineDistanceCalculator` sin necesitar PostgreSQL. Consulta el [informe RDD de M0](specs/m0-foundation/verification.md) y las [notas de revisión con evidencia visual y limitaciones](specs/m0-foundation/review-notes.md).
 
 ## Estructura
 
@@ -200,8 +218,8 @@ Se verifica migración repetible, readiness antes/después de migrar, indisponib
 backend/
   PadelMatch.Api/             API y composición (endpoints, autenticación JWT)
   PadelMatch.Application/     Contratos y casos de uso de aplicación
-  PadelMatch.Domain/          Núcleo de dominio (Player, InitialLevelEstimator)
-  PadelMatch.Infrastructure/  EF Core, PostgreSQL, migraciones y verificación de identidad externa
+  PadelMatch.Domain/          Núcleo de dominio (Player, InitialLevelEstimator, Club/Court/CourtSlot, HaversineDistanceCalculator)
+  PadelMatch.Infrastructure/  EF Core, PostgreSQL, migraciones, verificación de identidad externa y seed de desarrollo de clubes
   PadelMatch.Api.Tests/       Pruebas de integración (WebApplicationFactory + PostgreSQL real)
   PadelMatch.Domain.Tests/    Pruebas unitarias de dominio, sin dependencias externas
 mobile/                      React Native + Expo

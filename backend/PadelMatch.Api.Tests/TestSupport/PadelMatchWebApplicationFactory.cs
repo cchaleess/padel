@@ -16,6 +16,7 @@ public sealed class PadelMatchWebApplicationFactory(string connectionString, str
         builder.UseSetting("Auth:Google:Audience", "test-google-audience");
         builder.UseSetting("Auth:Apple:Audience", "test-apple-audience");
         builder.UseSetting("Auth:SessionSigningKey", "test-only-session-signing-key-32-bytes-minimum");
+        builder.UseSetting("Development:SeedClubs", "false");
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<IExternalIdentityVerifier>();

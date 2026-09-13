@@ -2,12 +2,16 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using PadelMatch.Api.Auth;
+using PadelMatch.Api.Clubs;
 using PadelMatch.Api.Players;
 using PadelMatch.Application;
 using PadelMatch.Infrastructure;
 using PadelMatch.Infrastructure.Auth;
+using PadelMatch.Infrastructure.Clubs;
+using PadelMatch.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -53,10 +57,19 @@ app.UseAuthorization();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+
+    if (app.Configuration.GetValue("Development:SeedClubs", defaultValue: false))
+    {
+        using var seedScope = app.Services.CreateScope();
+        var dbContext = seedScope.ServiceProvider.GetRequiredService<PadelMatchDbContext>();
+        var clock = seedScope.ServiceProvider.GetRequiredService<TimeProvider>();
+        await DevelopmentClubSeeder.SeedIfEmptyAsync(dbContext, clock, CancellationToken.None);
+    }
 }
 
 app.MapAuthEndpoints();
 app.MapPlayerEndpoints();
+app.MapClubEndpoints();
 
 app.MapGet("/health/live", (TimeProvider clock) =>
         TypedResults.Ok(new HealthResponse("healthy", clock.GetUtcNow())))
