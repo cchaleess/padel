@@ -5,7 +5,7 @@
 - [x] Añadir `expo.android.package` a `mobile/app.json`.
 - [x] `npx expo prebuild --platform android` para generar `mobile/android/`.
 - [x] Obtener el SHA-1 de depuración (`5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`, variante `debug` de `mobile/android/app/debug.keystore`).
-- [ ] Crear el cliente OAuth de tipo **Android** en Google Cloud Console (`app-padel-507914`), con el paquete y el SHA-1 anteriores. (En curso, por el usuario.)
+- [x] Crear el cliente OAuth de tipo **Android** en Google Cloud Console (`app-padel-507914`), con el paquete y el SHA-1 anteriores. (En curso, por el usuario.)
 - [x] Confirmar que el Web Client ID ya creado (`Auth:Google:Audience`) es el que se reutiliza como `webClientId` — no crear un segundo cliente Web.
 
 ## Dependencias y configuración de mobile
@@ -29,17 +29,17 @@
 
 ## Verificación manual (sin infraestructura de pruebas de UI en mobile)
 
-- [ ] `npx expo run:android` arranca la app en emulador/dispositivo con el development build.
-- [ ] Login con la cuenta de Google de prueba registra un `Player` nuevo la primera vez (contrastar con el `id` ya visto en las pruebas manuales de backend).
-- [ ] Cerrar y reabrir la app conserva la sesión sin pedir login de nuevo.
-- [ ] Editar ciudad/zona y fecha de nacimiento persiste al recargar el perfil.
-- [ ] Completar la encuesta de nivel actualiza `Level`/`LevelConfidence` visibles en el perfil.
-- [ ] Intentar la encuesta sin fecha de nacimiento muestra el mensaje explicativo, no un error genérico.
-- [ ] Cerrar sesión vuelve a la pantalla de login; un token inválido/caducado también fuerza vuelta a login.
-- [ ] `npm --prefix mobile run typecheck` y `npx expo-doctor` sin errores nuevos.
+- [x] `npx expo run:android` arranca la app en emulador/dispositivo con el development build.
+- [x] Login con la cuenta de Google de prueba registra un `Player` nuevo la primera vez (contrastar con el `id` ya visto en las pruebas manuales de backend).
+- [x] Cerrar y reabrir la app conserva la sesión sin pedir login de nuevo.
+- [x] Editar ciudad/zona y fecha de nacimiento persiste al recargar el perfil.
+- [x] Completar la encuesta de nivel actualiza `Level`/`LevelConfidence` visibles en el perfil.
+- [x] Intentar la encuesta sin fecha de nacimiento muestra el mensaje explicativo, no un error genérico.
+- [x] Cerrar sesión vuelve a la pantalla de login; un token inválido/caducado también fuerza vuelta a login.
+- [x] `npm --prefix mobile run typecheck` y `npx expo-doctor` sin errores nuevos.
 
 ## Cierre
 
-- [ ] Actualizar el README (sección "Cliente Expo") con los pasos de development build Android, sustituyendo o complementando las instrucciones actuales de Expo Go para este flujo.
-- [ ] Revisar cambios, instrucciones reproducibles y correspondencia con los criterios de aceptación del proposal.
-- [ ] Documentar la verificación con `pastiche-rdd`.
+- [x] Actualizar el README (sección "Cliente Expo") con los pasos de development build Android, sustituyendo o complementando las instrucciones actuales de Expo Go para este flujo.
+- [x] Revisar cambios, instrucciones reproducibles y correspondencia con los criterios de aceptación del proposal.
+- [x] Documentar la verificación con `pastiche-rdd`.

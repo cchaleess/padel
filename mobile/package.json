@@ -17,8 +17,8 @@
   "dependencies": {
     "@react-native-community/datetimepicker": "9.1.0",
     "@react-native-google-signin/google-signin": "^16.1.5",
-    "expo": "~57.0.21",
-    "expo-secure-store": "~57.0.3",
+    "expo": "~57.0.22",
+    "expo-secure-store": "~57.0.4",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",

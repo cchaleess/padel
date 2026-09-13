@@ -153,13 +153,22 @@ $env:ASPNETCORE_ENVIRONMENT = 'Development'
 dotnet run --project backend/PadelMatch.Api --launch-profile http --urls http://0.0.0.0:5080
 ```
 
-Con el dispositivo conectado (`adb devices` debe listarlo):
+Con el dispositivo conectado (`adb devices` debe listarlo), desde dentro de `mobile/` (el comando no admite `--prefix` desde la raíz):
 
 ```powershell
-npx expo run:android --prefix mobile
+cd mobile
+npx expo run:android
 ```
 
 Este comando compila e instala el development build; las siguientes veces basta con `npm --prefix mobile start` y reabrir la app instalada (usa Metro igual que Expo Go).
+
+En dispositivo físico por USB, si al abrir la app aparece "Unable to load script. Make sure you're running Metro", falta reenviar el puerto de Metro:
+
+```powershell
+adb reverse tcp:8081 tcp:8081
+```
+
+Con dispositivo físico, además, el móvil necesita **WiFi activo y en la misma red que el PC** (no basta con datos móviles) para poder llegar a `EXPO_PUBLIC_API_BASE_URL`; si no, el login se queda colgado tras la pantalla de Google porque la llamada a la API nunca responde.
 
 ## Verificación
 
