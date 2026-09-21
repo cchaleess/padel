@@ -24,3 +24,8 @@ mobile/ios/
 .env.*
 !.env.example
 *.log
+
+# Obsidian (vault personal abierto en la raíz del repo, no es parte del proyecto)
+.obsidian/
+*.canvas
+PROJECT_MAP.md
