@@ -2,7 +2,7 @@
 
 Base del MVP de una aplicación móvil para organizar partidos de pádel. M0 incorpora la solución .NET, PostgreSQL/EF Core, migraciones, OpenAPI y una pantalla inicial Expo. M1 añade `Player`: login social con Google y Apple, perfil propio y la encuesta de nivel inicial (backend en `m1-players`, pantallas de mobile en `m1-mobile-auth`). M2 añade clubes y pistas de solo lectura: descubrimiento por cercanía, búsqueda, detalle y huecos disponibles, más la aportación de clubes por jugadores. La creación de partidos se implementa en milestones posteriores.
 
-El alcance y las decisiones están en [la constitución](specs/CONSTITUTION.md), y en las specs de cada milestone: [M0](specs/m0-foundation/proposal.md) ([diseño](specs/m0-foundation/design.md), [tareas](specs/m0-foundation/tasks.md)), [M1 backend](specs/m1-players/proposal.md) ([diseño](specs/m1-players/design.md), [tareas](specs/m1-players/tasks.md)), [M1 mobile](specs/m1-mobile-auth/proposal.md) ([diseño](specs/m1-mobile-auth/design.md), [tareas](specs/m1-mobile-auth/tasks.md)) y [M2](specs/m2-clubs-courts/proposal.md) ([diseño](specs/m2-clubs-courts/design.md), [tareas](specs/m2-clubs-courts/tasks.md)).
+El alcance y las decisiones están en [la constitución](specs/CONSTITUTION.md), y en las specs de cada milestone: [M0](specs/m0-foundation/proposal.md) ([diseño](specs/m0-foundation/design.md), [tareas](specs/m0-foundation/tasks.md)), [M1 backend](specs/m1-players/proposal.md) ([diseño](specs/m1-players/design.md), [tareas](specs/m1-players/tasks.md)), [M1 mobile](specs/m1-mobile-auth/proposal.md) ([diseño](specs/m1-mobile-auth/design.md), [tareas](specs/m1-mobile-auth/tasks.md)), [M2 backend](specs/m2-clubs-courts/proposal.md) ([diseño](specs/m2-clubs-courts/design.md), [tareas](specs/m2-clubs-courts/tasks.md)) y [M2 mobile](specs/m2-mobile-clubs/proposal.md) ([diseño](specs/m2-mobile-clubs/design.md), [tareas](specs/m2-mobile-clubs/tasks.md)).
 
 ## Prerrequisitos
 
@@ -187,6 +187,18 @@ adb reverse tcp:8081 tcp:8081
 ```
 
 Con dispositivo físico, además, el móvil necesita **WiFi activo y en la misma red que el PC** (no basta con datos móviles) para poder llegar a `EXPO_PUBLIC_API_BASE_URL`; si no, el login se queda colgado tras la pantalla de Google porque la llamada a la API nunca responde.
+
+### Clubes y navegación (M2, development build de Android)
+
+Añade navegación por pestañas ([React Navigation](https://reactnavigation.org/): `@react-navigation/native`, `@react-navigation/bottom-tabs`, `@react-navigation/native-stack`, más `react-native-screens`, `react-native-safe-area-context` y `react-native-gesture-handler`) y geolocalización opcional (`expo-location`, con el plugin correspondiente y su texto de permiso ya añadidos a `mobile/app.json`). No requiere configuración adicional en `mobile/.env`: reutiliza `EXPO_PUBLIC_API_BASE_URL`.
+
+Cuatro pestañas: `Partidos` (con selector interno `Partidos`/`Clubes`, `Clubes` por defecto), `Crear` y `Actividad` (placeholders), `Perfil` (sin cambios respecto a `m1-mobile-auth`). Dentro de `Clubes`:
+
+- Lista de clubes cercanos (si se concede el permiso de ubicación) o por ciudad/zona/nombre (si se deniega); buscador con debounce que filtra por nombre.
+- Detalle de club con sus pistas, y huecos disponibles de cada pista.
+- "Aportar club" (nombre y dirección obligatorios) — el club queda marcado como no verificado y aparece luego en la búsqueda.
+
+Para probarlo manualmente, con la API y Metro arrancados y el dispositivo conectado: deniega el permiso de ubicación desde Ajustes del sistema para comprobar que la lista sigue mostrando clubes sin error, y usa el seed de desarrollo de `m2-clubs-courts` para probar la búsqueda por nombre.
 
 ## Verificación
 

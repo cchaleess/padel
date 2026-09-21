@@ -1,7 +1,11 @@
 import type {
   AuthResponse,
+  ClubDetail,
+  ClubSummary,
+  CourtSlot,
   LevelSurveyRequest,
   PlayerProfile,
+  SubmitClubRequest,
   UpdateProfileRequest,
 } from './types';
 
@@ -75,6 +79,30 @@ export const api = {
 
   completeLevelSurvey: (body: LevelSurveyRequest) =>
     request<PlayerProfile>('/api/players/me/level-survey', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  getNearbyClubs: (params?: { lat?: number; lng?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.lat !== undefined && params?.lng !== undefined) {
+      query.set('lat', String(params.lat));
+      query.set('lng', String(params.lng));
+    }
+    const suffix = query.toString();
+    return request<ClubSummary[]>(`/api/clubs/nearby${suffix ? `?${suffix}` : ''}`);
+  },
+
+  searchClubs: (query: string) =>
+    request<ClubSummary[]>(`/api/clubs/search?q=${encodeURIComponent(query)}`),
+
+  getClubDetails: (id: string) => request<ClubDetail>(`/api/clubs/${id}`),
+
+  getClubSlots: (clubId: string, courtId?: string) =>
+    request<CourtSlot[]>(`/api/clubs/${clubId}/slots${courtId ? `?courtId=${courtId}` : ''}`),
+
+  submitClub: (body: SubmitClubRequest) =>
+    request<ClubDetail>('/api/clubs', {
       method: 'POST',
       body: JSON.stringify(body),
     }),

@@ -18,7 +18,13 @@
     "plugins": [
       "@react-native-google-signin/google-signin",
       "expo-secure-store",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "PadelMatch usa tu ubicación para ordenar los clubes cercanos a ti."
+        }
+      ]
     ]
   }
 }

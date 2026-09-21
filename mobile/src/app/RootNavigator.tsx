@@ -1,16 +1,12 @@
-import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
 import { colors } from '../theme';
 import { useAuth } from '../features/auth/AuthContext';
 import LoginScreen from '../features/auth/LoginScreen';
-import ProfileScreen from '../features/players/ProfileScreen';
-import LevelSurveyScreen from '../features/players/LevelSurveyScreen';
-
-type Route = 'profile' | 'levelSurvey';
+import AppTabs from './AppTabs';
 
 export default function RootNavigator() {
   const { status } = useAuth();
-  const [route, setRoute] = useState<Route>('profile');
 
   if (status === 'loading') {
     return (
@@ -24,11 +20,11 @@ export default function RootNavigator() {
     return <LoginScreen />;
   }
 
-  if (route === 'levelSurvey') {
-    return <LevelSurveyScreen onDone={() => setRoute('profile')} onCancel={() => setRoute('profile')} />;
-  }
-
-  return <ProfileScreen onStartLevelSurvey={() => setRoute('levelSurvey')} />;
+  return (
+    <NavigationContainer>
+      <AppTabs />
+    </NavigationContainer>
+  );
 }
 
 const styles = StyleSheet.create({

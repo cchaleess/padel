@@ -33,3 +33,42 @@ export interface LevelSurveyRequest {
   weeklyFrequency: WeeklyFrequency;
   selfPerceivedLevel: SelfPerceivedLevel;
 }
+
+export type ClubStatus = 'Official' | 'UserSubmitted';
+
+export interface ClubSummary {
+  id: string;
+  name: string;
+  cityOrZone: string | null;
+  status: ClubStatus;
+  distanceKm: number | null;
+}
+
+export interface Court {
+  id: string;
+  name: string;
+}
+
+export interface ClubDetail {
+  id: string;
+  name: string;
+  address: string;
+  cityOrZone: string | null;
+  status: ClubStatus;
+  courts: Court[];
+}
+
+export interface CourtSlot {
+  id: string;
+  courtId: string;
+  courtName: string;
+  startsAt: string;
+  endsAt: string;
+  durationMinutes: number;
+}
+
+export interface SubmitClubRequest {
+  name: string;
+  address: string;
+  cityOrZone?: string | null;
+}
