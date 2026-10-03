@@ -1,18 +1,12 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { api } from '../../api/httpClient';
 import type { MatchDetail } from '../../api/types';
 import { colors, typography } from '../../theme';
-import type { ClubsStackParamList } from '../clubs/ClubsStackNavigator';
 import { formatSlotSchedule } from '../clubs/slotFormatting';
+import { getMatchTypeLabel } from './matchTypeLabel';
 
-type Props = NativeStackScreenProps<ClubsStackParamList, 'MatchDetail'>;
-
-const typeLabels: Record<MatchDetail['type'], string> = {
-  Friendly: 'Amistoso',
-  Competitive: 'Competitivo',
-};
+type Props = { route: { params: { matchId: string } } };
 
 export default function MatchDetailScreen({ route }: Props) {
   const { matchId } = route.params;
@@ -42,7 +36,7 @@ export default function MatchDetailScreen({ route }: Props) {
 
   return (
     <View style={styles.screen}>
-      <Text style={typography.eyebrow}>{typeLabels[match.type]}</Text>
+      <Text style={typography.eyebrow}>{getMatchTypeLabel(match.type)}</Text>
       <Text accessibilityRole="header" style={typography.title}>
         {match.clubName}
       </Text>

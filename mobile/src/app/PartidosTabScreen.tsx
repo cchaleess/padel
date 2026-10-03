@@ -1,15 +1,14 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import ComingSoonScreen from '../components/ui/ComingSoonScreen';
 import ClubsStackNavigator from '../features/clubs/ClubsStackNavigator';
+import PartidosStackNavigator from '../features/matches/PartidosStackNavigator';
 import { colors } from '../theme';
 
 type Segment = 'partidos' | 'clubes';
 
-/// <summary>Two segments, not a navigation library: see design.md "Alternativas y límites".
-/// Defaults to "clubes" because "partidos" has no real content until M4.</summary>
+/// <summary>Two segments, not a navigation library: see design.md "Alternativas y límites".</summary>
 export default function PartidosTabScreen() {
-  const [segment, setSegment] = useState<Segment>('clubes');
+  const [segment, setSegment] = useState<Segment>('partidos');
 
   return (
     <View style={styles.container}>
@@ -23,7 +22,7 @@ export default function PartidosTabScreen() {
       </View>
 
       <View style={styles.content}>
-        {segment === 'partidos' ? <ComingSoonScreen title="Partidos" /> : <ClubsStackNavigator />}
+        {segment === 'partidos' ? <PartidosStackNavigator /> : <ClubsStackNavigator />}
       </View>
     </View>
   );

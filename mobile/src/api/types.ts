@@ -104,3 +104,22 @@ export interface CreateMatchRequest {
   minMatchesRequired?: number | null;
   note?: string | null;
 }
+
+export interface MatchFeedItem {
+  id: string;
+  clubId: string;
+  clubName: string;
+  courtName: string;
+  startsAt: string;
+  endsAt: string;
+  durationMinutes: number;
+  type: MatchType;
+  minLevel: number | null;
+  maxLevel: number | null;
+  distanceKm: number | null;
+}
+
+export interface MatchFeed {
+  forYou: MatchFeedItem[];
+  outOfRange: MatchFeedItem[];
+}

@@ -6,6 +6,7 @@ import type {
   CreateMatchRequest,
   LevelSurveyRequest,
   MatchDetail,
+  MatchFeed,
   PlayerProfile,
   SubmitClubRequest,
   UpdateProfileRequest,
@@ -116,4 +117,14 @@ export const api = {
     }),
 
   getMatchDetails: (id: string) => request<MatchDetail>(`/api/matches/${id}`),
+
+  getMatchFeed: (params?: { lat?: number; lng?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.lat !== undefined && params?.lng !== undefined) {
+      query.set('lat', String(params.lat));
+      query.set('lng', String(params.lng));
+    }
+    const suffix = query.toString();
+    return request<MatchFeed>(`/api/matches/feed${suffix ? `?${suffix}` : ''}`);
+  },
 };

@@ -215,7 +215,7 @@ Con dispositivo físico, además, el móvil necesita **WiFi activo y en la misma
 
 Añade navegación por pestañas ([React Navigation](https://reactnavigation.org/): `@react-navigation/native`, `@react-navigation/bottom-tabs`, `@react-navigation/native-stack`, más `react-native-screens`, `react-native-safe-area-context` y `react-native-gesture-handler`) y geolocalización opcional (`expo-location`, con el plugin correspondiente y su texto de permiso ya añadidos a `mobile/app.json`). No requiere configuración adicional en `mobile/.env`: reutiliza `EXPO_PUBLIC_API_BASE_URL`.
 
-Cuatro pestañas: `Partidos` (con selector interno `Partidos`/`Clubes`, `Clubes` por defecto), `Crear` y `Actividad` (placeholders), `Perfil` (sin cambios respecto a `m1-mobile-auth`). Dentro de `Clubes`:
+Cuatro pestañas: `Partidos` (con selector interno `Partidos`/`Clubes`), `Crear` y `Actividad` (placeholders), `Perfil` (sin cambios respecto a `m1-mobile-auth`). Dentro de `Clubes`:
 
 - Lista de clubes cercanos (si se concede el permiso de ubicación) o por ciudad/zona/nombre (si se deniega); buscador con debounce que filtra por nombre.
 - Detalle de club con la lista de horarios disponibles de todas sus pistas (ordenada por hora y luego por duración; la pista se muestra como dato secundario de cada hueco).
@@ -228,6 +228,12 @@ Para probarlo manualmente, con la API y Metro arrancados y el dispositivo conect
 La pestaña `Crear` deja de ser un placeholder: monta el mismo `ClubsStackNavigator` que `Partidos`→`Clubes` (segunda instancia, con su propio estado de navegación), así que elegir club→horario disponible es idéntico desde cualquiera de los dos puntos de entrada. El detalle de club ya no obliga a elegir pista primero: lista directamente los horarios disponibles de todas las pistas del club. Tocar un hueco disponible — ahora accionable en ambos sitios, ya no es de solo lectura — lleva al formulario de creación, sin ningún tipo preseleccionado (`Amistoso`/`Competitivo`; `Competitivo` aparece deshabilitado con una nota si el jugador no ha completado la encuesta de nivel, y el botón de crear permanece deshabilitado hasta elegir uno). Al crear, la app navega al detalle del partido (club, pista, horario, tipo, y rango/mínimo/nota si aplica), sin sugerir en ningún momento que el jugador ya ocupa una plaza — esa confirmación es un flujo posterior (M5).
 
 No requiere configuración adicional en `mobile/.env`. Límite conocido y documentado en [design.md](specs/m3-mobile-matches/design.md): al reutilizar el mismo árbol de pantallas bajo `Crear`, su primera pantalla sigue titulada "Clubes" y conserva el botón de aportar club, en vez de un título ajustado a "elegir dónde crear un partido".
+
+### Feed de partidos (M4, development build de Android)
+
+La pestaña `Partidos` arranca ahora en su propio segmento (antes `Clubes` por defecto): al entrar, el jugador ve directamente el feed de `GET /api/matches/feed`, sin tocar nada — mismo permiso de ubicación opcional que el catálogo de clubes. Dos secciones, "Partidos para ti" y "Otros partidos cercanos" (se omite la que esté vacía); cada card muestra club, horario y tipo, y el rango de nivel si es `Competitive`. El feed se recarga solo al entrar/volver a la pestaña, y también con el gesto de deslizar hacia abajo. Tocar una card navega al detalle ya existente del partido (`m3-mobile-matches`), reutilizado tal cual.
+
+No requiere configuración adicional en `mobile/.env`. Sin acción de unirse todavía (M5), sin calidad estimada ni contador de confirmados (el backend no los expone, ver [m4-discovery](specs/m4-discovery/design.md)).
 
 ## Verificación
 
