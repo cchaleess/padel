@@ -70,6 +70,61 @@ public static class MatchEndpoints
             .WithName("GetMatchDetails")
             .WithSummary("Returns a match's detail: club, court, schedule, type, and level range/minimum/note when applicable.")
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPost("/{id:guid}/hold", async Task<Results<Ok<SeatHoldResponse>, ProblemHttpResult>> (
+                Guid id, ClaimsPrincipal user, IMatchSeatService seats, CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    var heldUntilUtc = await seats.HoldSeatAsync(id, GetPlayerId(user), cancellationToken);
+                    return TypedResults.Ok(new SeatHoldResponse(heldUntilUtc));
+                }
+                catch (PlayerAlreadyHasSeatException ex)
+                {
+                    return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message);
+                }
+                catch (SeatUnavailableException ex)
+                {
+                    return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message);
+                }
+            })
+            .WithName("HoldMatchSeat")
+            .WithSummary("Claims one of the match's 4 seats for the authenticated player; held for 5 minutes.")
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPost("/{id:guid}/confirm", async Task<Results<Ok, ProblemHttpResult>> (
+                Guid id, ClaimsPrincipal user, IMatchSeatService seats, CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    await seats.ConfirmSeatAsync(id, GetPlayerId(user), cancellationToken);
+                    return TypedResults.Ok();
+                }
+                catch (SeatNotHeldException ex)
+                {
+                    return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message);
+                }
+            })
+            .WithName("ConfirmMatchSeat")
+            .WithSummary("Confirms the authenticated player's held seat (simulated payment).")
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPost("/{id:guid}/release", async Task<Results<Ok, ProblemHttpResult>> (
+                Guid id, ClaimsPrincipal user, IMatchSeatService seats, CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    await seats.ReleaseSeatAsync(id, GetPlayerId(user), cancellationToken);
+                    return TypedResults.Ok();
+                }
+                catch (SeatNotHeldException ex)
+                {
+                    return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message);
+                }
+            })
+            .WithName("ReleaseMatchSeat")
+            .WithSummary("Releases the authenticated player's held seat back to Available before it expires.")
+            .ProducesProblem(StatusCodes.Status409Conflict);
     }
 
     private static Guid GetPlayerId(ClaimsPrincipal user) =>

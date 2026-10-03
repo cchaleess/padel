@@ -45,6 +45,8 @@ public sealed record MatchDetailResponse(
 public sealed record CreateMatchRequest(
     Guid CourtSlotId, MatchType Type, decimal? MinLevel, decimal? MaxLevel, int? MinMatchesRequired, string? Note);
 
+public sealed record SeatHoldResponse(DateTimeOffset HeldUntilUtc);
+
 public sealed record MatchFeedResponse(IReadOnlyList<MatchFeedItemResponse> ForYou, IReadOnlyList<MatchFeedItemResponse> OutOfRange)
 {
     public static MatchFeedResponse From(MatchFeed feed) => new(

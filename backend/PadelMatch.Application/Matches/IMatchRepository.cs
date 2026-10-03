@@ -16,6 +16,10 @@ public interface IMatchRepository
     /// expirados").</summary>
     Task<IReadOnlyList<MatchWithSlotDetails>> FindOpenUpcomingAsync(DateTimeOffset now, CancellationToken cancellationToken);
 
+    /// <summary>Flips Open to Full when the 4th seat confirms (design.md, "Open→Full"). A no-op, not an error,
+    /// if the match isn't Open anymore — the ExecuteUpdateAsync WHERE clause makes it idempotent.</summary>
+    Task MarkFullAsync(Guid matchId, CancellationToken cancellationToken);
+
     /// <exception cref="CourtSlotUnavailableException">A concurrent request already booked the same CourtSlot
     /// (unique index backstop, design.md "Exclusividad del CourtSlot bajo concurrencia").</exception>
     Task SaveChangesAsync(CancellationToken cancellationToken);

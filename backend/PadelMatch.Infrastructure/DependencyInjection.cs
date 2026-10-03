@@ -25,6 +25,8 @@ public static class DependencyInjection
         services.AddScoped<IMatchRepository, MatchRepository>();
         services.AddScoped<IMatchCreationService, MatchCreationService>();
         services.AddScoped<IMatchFeedService, MatchFeedService>();
+        services.AddScoped<IMatchSeatRepository, MatchSeatRepository>();
+        services.AddScoped<IMatchSeatService, MatchSeatService>();
 
         services.AddSingleton(authSettings);
         services.AddSingleton<IProviderIdentityVerifier, GoogleIdentityVerifier>();

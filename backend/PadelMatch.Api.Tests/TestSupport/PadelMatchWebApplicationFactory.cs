@@ -9,6 +9,8 @@ namespace PadelMatch.Api.Tests.TestSupport;
 public sealed class PadelMatchWebApplicationFactory(string connectionString, string environment = "Development")
     : WebApplicationFactory<Program>
 {
+    public MutableTimeProvider Clock { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(environment);
@@ -21,6 +23,8 @@ public sealed class PadelMatchWebApplicationFactory(string connectionString, str
         {
             services.RemoveAll<IExternalIdentityVerifier>();
             services.AddSingleton<IExternalIdentityVerifier, FakeExternalIdentityVerifier>();
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(Clock);
         });
     }
 }

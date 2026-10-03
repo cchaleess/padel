@@ -24,6 +24,11 @@ internal sealed class MatchRepository(PadelMatchDbContext dbContext) : IMatchRep
     public async Task AddMatchAsync(Match match, CancellationToken cancellationToken) =>
         await dbContext.Matches.AddAsync(match, cancellationToken);
 
+    public async Task MarkFullAsync(Guid matchId, CancellationToken cancellationToken) =>
+        await dbContext.Matches
+            .Where(m => m.Id == matchId && m.Status == MatchStatus.Open)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(m => m.Status, MatchStatus.Full), cancellationToken);
+
     private IQueryable<MatchWithSlotDetails> JoinSlotDetails(IQueryable<Match> matches, DateTimeOffset? startsAtAfter = null) =>
         matches
             .Join(dbContext.CourtSlots, match => match.CourtSlotId, slot => slot.Id, (match, slot) => new { match, slot })

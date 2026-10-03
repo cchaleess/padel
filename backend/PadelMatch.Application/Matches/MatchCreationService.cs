@@ -8,7 +8,8 @@ using MatchType = PadelMatch.Domain.Matches.MatchType;
 namespace PadelMatch.Application.Matches;
 
 public sealed class MatchCreationService(
-    IMatchRepository matchRepository, IClubRepository clubRepository, IPlayerRepository playerRepository, TimeProvider clock)
+    IMatchRepository matchRepository, IMatchSeatRepository seatRepository, IClubRepository clubRepository,
+    IPlayerRepository playerRepository, TimeProvider clock)
     : IMatchCreationService
 {
     public async Task<Match> CreateMatchAsync(
@@ -46,6 +47,12 @@ public sealed class MatchCreationService(
         slot.Book();
 
         await matchRepository.AddMatchAsync(match, cancellationToken);
+        // 4 seats, all Available, created with the Match itself (design.md, "MatchCreationService crea las 4
+        // plazas"): a match always has exactly 4 seats from the moment it exists, none created later.
+        foreach (var _ in Enumerable.Range(0, 4))
+        {
+            await seatRepository.AddSeatAsync(MatchSeat.CreateAvailable(match.Id), cancellationToken);
+        }
         await matchRepository.SaveChangesAsync(cancellationToken);
 
         return match;
