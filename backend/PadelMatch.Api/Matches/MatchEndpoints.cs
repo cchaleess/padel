@@ -43,6 +43,16 @@ public static class MatchEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        group.MapGet("/feed", async (
+                double? lat, double? lng, string? cityOrZone,
+                ClaimsPrincipal user, IMatchFeedService feedService, CancellationToken cancellationToken) =>
+            {
+                var feed = await feedService.GetFeedAsync(GetPlayerId(user), lat, lng, cityOrZone, cancellationToken);
+                return TypedResults.Ok(MatchFeedResponse.From(feed));
+            })
+            .WithName("GetMatchFeed")
+            .WithSummary("Lists open, upcoming matches near the player, grouped into for-you (compatible) and out-of-range.");
+
         group.MapGet("/{id:guid}", async Task<Results<Ok<MatchDetailResponse>, ProblemHttpResult>> (
                 Guid id, IMatchRepository matches, CancellationToken cancellationToken) =>
             {

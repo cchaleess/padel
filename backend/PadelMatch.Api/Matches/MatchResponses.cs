@@ -44,3 +44,21 @@ public sealed record MatchDetailResponse(
 
 public sealed record CreateMatchRequest(
     Guid CourtSlotId, MatchType Type, decimal? MinLevel, decimal? MaxLevel, int? MinMatchesRequired, string? Note);
+
+public sealed record MatchFeedResponse(IReadOnlyList<MatchFeedItemResponse> ForYou, IReadOnlyList<MatchFeedItemResponse> OutOfRange)
+{
+    public static MatchFeedResponse From(MatchFeed feed) => new(
+        feed.ForYou.Select(MatchFeedItemResponse.From).ToList(),
+        feed.OutOfRange.Select(MatchFeedItemResponse.From).ToList());
+}
+
+public sealed record MatchFeedItemResponse(
+    Guid Id, Guid ClubId, string ClubName, string CourtName,
+    DateTimeOffset StartsAt, DateTimeOffset EndsAt, int DurationMinutes,
+    MatchType Type, decimal? MinLevel, decimal? MaxLevel, double? DistanceKm)
+{
+    public static MatchFeedItemResponse From(MatchWithDistance item) => new(
+        item.Details.Match.Id, item.Details.ClubId, item.Details.ClubName, item.Details.CourtName,
+        item.Details.StartsAt, item.Details.EndsAt, (int)(item.Details.EndsAt - item.Details.StartsAt).TotalMinutes,
+        item.Details.Match.Type, item.Details.Match.MinLevel, item.Details.Match.MaxLevel, item.DistanceKm);
+}

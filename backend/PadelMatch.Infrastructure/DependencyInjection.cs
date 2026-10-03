@@ -24,6 +24,7 @@ public static class DependencyInjection
         services.AddScoped<IClubSubmissionService, ClubSubmissionService>();
         services.AddScoped<IMatchRepository, MatchRepository>();
         services.AddScoped<IMatchCreationService, MatchCreationService>();
+        services.AddScoped<IMatchFeedService, MatchFeedService>();
 
         services.AddSingleton(authSettings);
         services.AddSingleton<IProviderIdentityVerifier, GoogleIdentityVerifier>();
