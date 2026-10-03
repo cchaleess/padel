@@ -1,38 +1,12 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import OptionGroup from '../../components/ui/OptionGroup';
 import { api, ApiError } from '../../api/httpClient';
 import type { SelfPerceivedLevel, WeeklyFrequency, YearsPlayingPadel } from '../../api/types';
 import { colors, typography } from '../../theme';
 import { useAuth } from '../auth/AuthContext';
 import { selfPerceivedLevelOptions, weeklyFrequencyOptions, yearsPlayingOptions } from './levelLabels';
-
-interface OptionGroupProps<T extends string> {
-  label: string;
-  options: { value: T; label: string }[];
-  value: T | null;
-  onSelect: (value: T) => void;
-}
-
-function OptionGroup<T extends string>({ label, options, value, onSelect }: OptionGroupProps<T>) {
-  return (
-    <View style={styles.group}>
-      <Text style={styles.groupLabel}>{label}</Text>
-      {options.map((option) => {
-        const selected = option.value === value;
-        return (
-          <Pressable
-            key={option.value}
-            style={[styles.option, selected && styles.optionSelected]}
-            onPress={() => onSelect(option.value)}
-          >
-            <Text style={[styles.optionLabel, selected && styles.optionLabelSelected]}>{option.label}</Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
 
 export default function LevelSurveyScreen({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
   const { refreshProfile } = useAuth();
@@ -97,19 +71,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { paddingHorizontal: 28, paddingVertical: 48, paddingBottom: 64 },
   accent: { height: 5, width: 52, backgroundColor: colors.accent, borderRadius: 3, marginVertical: 24 },
-  group: { marginBottom: 24 },
-  groupLabel: { ...typography.note, fontWeight: '700', marginBottom: 10 },
-  option: {
-    borderWidth: 1,
-    borderColor: '#D8D5C4',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 8,
-  },
-  optionSelected: { borderColor: colors.brandDark, backgroundColor: '#EDEBDD' },
-  optionLabel: { color: colors.ink, fontSize: 15 },
-  optionLabelSelected: { fontWeight: '700', color: colors.brandDark },
   error: { marginBottom: 16, color: '#B3261E', fontSize: 14, lineHeight: 20 },
   submitButton: {
     backgroundColor: colors.brandDark,

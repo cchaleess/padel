@@ -72,3 +72,35 @@ export interface SubmitClubRequest {
   address: string;
   cityOrZone?: string | null;
 }
+
+export type MatchType = 'Competitive' | 'Friendly';
+
+export type MatchStatus = 'Open';
+
+export interface MatchDetail {
+  id: string;
+  clubId: string;
+  clubName: string;
+  courtId: string;
+  courtName: string;
+  startsAt: string;
+  endsAt: string;
+  durationMinutes: number;
+  type: MatchType;
+  status: MatchStatus;
+  organizerId: string;
+  organizerLevelAtCreation: number | null;
+  minLevel: number | null;
+  maxLevel: number | null;
+  minMatchesRequired: number | null;
+  note: string | null;
+}
+
+export interface CreateMatchRequest {
+  courtSlotId: string;
+  type: MatchType;
+  minLevel?: number | null;
+  maxLevel?: number | null;
+  minMatchesRequired?: number | null;
+  note?: string | null;
+}

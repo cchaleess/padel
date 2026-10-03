@@ -3,7 +3,9 @@ import type {
   ClubDetail,
   ClubSummary,
   CourtSlot,
+  CreateMatchRequest,
   LevelSurveyRequest,
+  MatchDetail,
   PlayerProfile,
   SubmitClubRequest,
   UpdateProfileRequest,
@@ -106,4 +108,12 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
+  createMatch: (body: CreateMatchRequest) =>
+    request<MatchDetail>('/api/matches', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  getMatchDetails: (id: string) => request<MatchDetail>(`/api/matches/${id}`),
 };

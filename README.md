@@ -1,8 +1,8 @@
 # PadelMatch
 
-Base del MVP de una aplicación móvil para organizar partidos de pádel. M0 incorpora la solución .NET, PostgreSQL/EF Core, migraciones, OpenAPI y una pantalla inicial Expo. M1 añade `Player`: login social con Google y Apple, perfil propio y la encuesta de nivel inicial (backend en `m1-players`, pantallas de mobile en `m1-mobile-auth`). M2 añade clubes y pistas de solo lectura: descubrimiento por cercanía, búsqueda, detalle y huecos disponibles, más la aportación de clubes por jugadores. La creación de partidos se implementa en milestones posteriores.
+Base del MVP de una aplicación móvil para organizar partidos de pádel. M0 incorpora la solución .NET, PostgreSQL/EF Core, migraciones, OpenAPI y una pantalla inicial Expo. M1 añade `Player`: login social con Google y Apple, perfil propio y la encuesta de nivel inicial (backend en `m1-players`, pantallas de mobile en `m1-mobile-auth`). M2 añade clubes y pistas de solo lectura: descubrimiento por cercanía, búsqueda, detalle y huecos disponibles, más la aportación de clubes por jugadores. M3 añade la creación de partidos a partir de un hueco de pista disponible (backend en `m3-match-creation`, pantallas de mobile en `m3-mobile-matches`).
 
-El alcance y las decisiones están en [la constitución](specs/CONSTITUTION.md), y en las specs de cada milestone: [M0](specs/m0-foundation/proposal.md) ([diseño](specs/m0-foundation/design.md), [tareas](specs/m0-foundation/tasks.md)), [M1 backend](specs/m1-players/proposal.md) ([diseño](specs/m1-players/design.md), [tareas](specs/m1-players/tasks.md)), [M1 mobile](specs/m1-mobile-auth/proposal.md) ([diseño](specs/m1-mobile-auth/design.md), [tareas](specs/m1-mobile-auth/tasks.md)), [M2 backend](specs/m2-clubs-courts/proposal.md) ([diseño](specs/m2-clubs-courts/design.md), [tareas](specs/m2-clubs-courts/tasks.md)) y [M2 mobile](specs/m2-mobile-clubs/proposal.md) ([diseño](specs/m2-mobile-clubs/design.md), [tareas](specs/m2-mobile-clubs/tasks.md)).
+El alcance y las decisiones están en [la constitución](specs/CONSTITUTION.md), y en las specs de cada milestone: [M0](specs/m0-foundation/proposal.md) ([diseño](specs/m0-foundation/design.md), [tareas](specs/m0-foundation/tasks.md)), [M1 backend](specs/m1-players/proposal.md) ([diseño](specs/m1-players/design.md), [tareas](specs/m1-players/tasks.md)), [M1 mobile](specs/m1-mobile-auth/proposal.md) ([diseño](specs/m1-mobile-auth/design.md), [tareas](specs/m1-mobile-auth/tasks.md)), [M2 backend](specs/m2-clubs-courts/proposal.md) ([diseño](specs/m2-clubs-courts/design.md), [tareas](specs/m2-clubs-courts/tasks.md)), [M2 mobile](specs/m2-mobile-clubs/proposal.md) ([diseño](specs/m2-mobile-clubs/design.md), [tareas](specs/m2-mobile-clubs/tasks.md)), [M3 backend](specs/m3-match-creation/proposal.md) ([diseño](specs/m3-match-creation/design.md), [tareas](specs/m3-match-creation/tasks.md)) y [M3 mobile](specs/m3-mobile-matches/proposal.md) ([diseño](specs/m3-mobile-matches/design.md), [tareas](specs/m3-mobile-matches/tasks.md)).
 
 ## Prerrequisitos
 
@@ -71,7 +71,7 @@ Invoke-RestMethod http://localhost:5080/openapi/v1.json
 
 `/health/live` comprueba el proceso. `/health/ready` devuelve 200 cuando PostgreSQL es accesible y las migraciones están aplicadas, y 503 si falta la base o alguna migración. OpenAPI se publica solo en Development; puede abrirse directamente en un navegador o importarse en un cliente HTTP.
 
-La migración `InitialFoundation` no crea tablas de negocio: establece `__EFMigrationsHistory` como punto de partida. `AddPlayers` (M1) crea `Players` y `PlayerExternalIdentities`, con índice único en `(Provider, ProviderSubjectId)`. `AddClubsAndCourts` (M2) crea `Clubs`, `Courts` y `CourtSlots`. Repetir `database update` sin cambios no añade otra entrada. La API no aplica migraciones automáticamente.
+La migración `InitialFoundation` no crea tablas de negocio: establece `__EFMigrationsHistory` como punto de partida. `AddPlayers` (M1) crea `Players` y `PlayerExternalIdentities`, con índice único en `(Provider, ProviderSubjectId)`. `AddClubsAndCourts` (M2) crea `Clubs`, `Courts` y `CourtSlots`. `AddMatches` (M3) crea `Matches`, con índice único en `CourtSlotId` (backstop de la exclusividad del hueco ante concurrencia). Repetir `database update` sin cambios no añade otra entrada. La API no aplica migraciones automáticamente.
 
 Para una futura modificación real del modelo:
 
@@ -124,6 +124,18 @@ POST /api/clubs          [autenticado] { name, address, cityOrZone? }
 ### Datos de desarrollo
 
 No hay panel de gestión de clubes en el MVP: los clubes/pistas/huecos de ejemplo se cargan mediante `DevelopmentClubSeeder`, que se ejecuta al arrancar la API solo si **ambas** condiciones se cumplen: `ASPNETCORE_ENVIRONMENT=Development` y `Development:SeedClubs=true` (ya activo en `appsettings.Development.json`). Es idempotente (no vuelve a sembrar si ya hay clubes) y **no es apto para producción** — el conjunto de datos (2 clubes oficiales con coordenadas reales, sus pistas y huecos de los próximos días) es deliberadamente mínimo y puede cambiar sin aviso. Los tests de integración desactivan explícitamente esta variable para no depender de estos datos.
+
+## Creación de partidos (M3)
+
+Un jugador autenticado crea un `Match` a partir de un `CourtSlot` `Available` concreto, convirtiéndose en organizador. El tipo (`Competitive`/`Friendly`) no cambia después; horario y duración son los del hueco elegido, sin volver a pedirlos. Crear el partido **no ocupa ninguna plaza** — ni siquiera la del organizador: esa confirmación (contra pago, aunque simulado en el MVP) es un flujo de M5 que esta spec no implementa. Ver [design.md](specs/m3-match-creation/design.md) para el detalle de exclusividad del hueco ante concurrencia.
+
+```text
+POST /api/matches      [autenticado] { courtSlotId, type, minLevel?, maxLevel?, minMatchesRequired?, note? }
+GET  /api/matches/{id} [autenticado]
+```
+
+- `Competitive` exige que el organizador tenga puntaje (`Player.Level` no nulo) y un rango `minLevel`/`maxLevel` que contenga ese nivel (snapshot, `OrganizerLevelAtCreation`); `minMatchesRequired` es opcional. `Friendly` no exige nada de eso; ambos tipos aceptan una `note` opcional (máx. 500 caracteres).
+- El `CourtSlot` pasa a `Booked` al crear el partido. Dos intentos concurrentes sobre el mismo hueco no pueden tener éxito ambos: la comprobación de estado es la vía rápida, y un índice único sobre `Matches.CourtSlotId` es el backstop real ante la carrera (ambos casos responden 409).
 
 ## Cliente Expo
 
@@ -195,10 +207,16 @@ Añade navegación por pestañas ([React Navigation](https://reactnavigation.org
 Cuatro pestañas: `Partidos` (con selector interno `Partidos`/`Clubes`, `Clubes` por defecto), `Crear` y `Actividad` (placeholders), `Perfil` (sin cambios respecto a `m1-mobile-auth`). Dentro de `Clubes`:
 
 - Lista de clubes cercanos (si se concede el permiso de ubicación) o por ciudad/zona/nombre (si se deniega); buscador con debounce que filtra por nombre.
-- Detalle de club con sus pistas, y huecos disponibles de cada pista.
+- Detalle de club con la lista de horarios disponibles de todas sus pistas (ordenada por hora y luego por duración; la pista se muestra como dato secundario de cada hueco).
 - "Aportar club" (nombre y dirección obligatorios) — el club queda marcado como no verificado y aparece luego en la búsqueda.
 
 Para probarlo manualmente, con la API y Metro arrancados y el dispositivo conectado: deniega el permiso de ubicación desde Ajustes del sistema para comprobar que la lista sigue mostrando clubes sin error, y usa el seed de desarrollo de `m2-clubs-courts` para probar la búsqueda por nombre.
+
+### Crear partido (M3, development build de Android)
+
+La pestaña `Crear` deja de ser un placeholder: monta el mismo `ClubsStackNavigator` que `Partidos`→`Clubes` (segunda instancia, con su propio estado de navegación), así que elegir club→horario disponible es idéntico desde cualquiera de los dos puntos de entrada. El detalle de club ya no obliga a elegir pista primero: lista directamente los horarios disponibles de todas las pistas del club. Tocar un hueco disponible — ahora accionable en ambos sitios, ya no es de solo lectura — lleva al formulario de creación, sin ningún tipo preseleccionado (`Amistoso`/`Competitivo`; `Competitivo` aparece deshabilitado con una nota si el jugador no ha completado la encuesta de nivel, y el botón de crear permanece deshabilitado hasta elegir uno). Al crear, la app navega al detalle del partido (club, pista, horario, tipo, y rango/mínimo/nota si aplica), sin sugerir en ningún momento que el jugador ya ocupa una plaza — esa confirmación es un flujo posterior (M5).
+
+No requiere configuración adicional en `mobile/.env`. Límite conocido y documentado en [design.md](specs/m3-mobile-matches/design.md): al reutilizar el mismo árbol de pantallas bajo `Crear`, su primera pantalla sigue titulada "Clubes" y conserva el botón de aportar club, en vez de un título ajustado a "elegir dónde crear un partido".
 
 ## Verificación
 
@@ -222,7 +240,7 @@ Las pruebas backend usan PostgreSQL real. Crean bases temporales `padelmatch_tes
 $env:PADELMATCH_TEST_CONNECTION = 'Host=localhost;Port=5433;Database=postgres;Username=padelmatch;Password=TU_PASSWORD;Timeout=5'
 ```
 
-Se verifica migración repetible, readiness antes/después de migrar, indisponibilidad de base, liveness independiente y contrato OpenAPI (M0); alta/reconocimiento de `Player` por proveedor, no fusión de cuentas entre proveedores con el mismo email, autorización 401/200 de `/api/players/me*` y el cálculo de la encuesta de nivel (M1); y orden por distancia/ciudad-zona/nombre de `GET /api/clubs/nearby`, búsqueda por nombre, detalle, filtrado de huecos por rango/pista/disponibilidad y aportación de clubes por jugadores (M2). Las pruebas de `PadelMatch.Api.Tests` sustituyen `IExternalIdentityVerifier` por un doble determinista (`FakeExternalIdentityVerifier`): no llaman a Google/Apple reales; también desactivan `Development:SeedClubs` para no depender de los datos de desarrollo de M2. `PadelMatch.Domain.Tests` cubre `InitialLevelEstimator` y `HaversineDistanceCalculator` sin necesitar PostgreSQL. Consulta el [informe RDD de M0](specs/m0-foundation/verification.md) y las [notas de revisión con evidencia visual y limitaciones](specs/m0-foundation/review-notes.md).
+Se verifica migración repetible, readiness antes/después de migrar, indisponibilidad de base, liveness independiente y contrato OpenAPI (M0); alta/reconocimiento de `Player` por proveedor, no fusión de cuentas entre proveedores con el mismo email, autorización 401/200 de `/api/players/me*` y el cálculo de la encuesta de nivel (M1); orden por distancia/ciudad-zona/nombre de `GET /api/clubs/nearby`, búsqueda por nombre, detalle, filtrado de huecos por rango/pista/disponibilidad y aportación de clubes por jugadores (M2); y creación de partidos `Friendly`/`Competitive`, snapshot del nivel del organizador, rechazo de rango inválido o de un `Competitive` sin puntaje, transición del `CourtSlot` a `Booked`, rechazo (409) de un segundo intento sobre el mismo hueco incluida una prueba de concurrencia real con `Task.WhenAll`, y `GET /api/matches/{id}` (M3). Las pruebas de `PadelMatch.Api.Tests` sustituyen `IExternalIdentityVerifier` por un doble determinista (`FakeExternalIdentityVerifier`): no llaman a Google/Apple reales; también desactivan `Development:SeedClubs` para no depender de los datos de desarrollo de M2. `PadelMatch.Domain.Tests` cubre `InitialLevelEstimator` y `HaversineDistanceCalculator` sin necesitar PostgreSQL. Consulta el [informe RDD de M0](specs/m0-foundation/verification.md) y las [notas de revisión con evidencia visual y limitaciones](specs/m0-foundation/review-notes.md).
 
 ## Estructura
 
@@ -230,7 +248,7 @@ Se verifica migración repetible, readiness antes/después de migrar, indisponib
 backend/
   PadelMatch.Api/             API y composición (endpoints, autenticación JWT)
   PadelMatch.Application/     Contratos y casos de uso de aplicación
-  PadelMatch.Domain/          Núcleo de dominio (Player, InitialLevelEstimator, Club/Court/CourtSlot, HaversineDistanceCalculator)
+  PadelMatch.Domain/          Núcleo de dominio (Player, InitialLevelEstimator, Club/Court/CourtSlot, HaversineDistanceCalculator, Match)
   PadelMatch.Infrastructure/  EF Core, PostgreSQL, migraciones, verificación de identidad externa y seed de desarrollo de clubes
   PadelMatch.Api.Tests/       Pruebas de integración (WebApplicationFactory + PostgreSQL real)
   PadelMatch.Domain.Tests/    Pruebas unitarias de dominio, sin dependencias externas
