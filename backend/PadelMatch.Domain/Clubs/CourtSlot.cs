@@ -32,4 +32,16 @@ public sealed class CourtSlot
             Status = SlotStatus.Available
         };
     }
+
+    /// <summary>Marks the slot as exclusively taken by a match (M3). The fast-path guard against a non-available
+    /// slot; the real invariant under concurrency is the unique index on Matches.CourtSlotId.</summary>
+    public void Book()
+    {
+        if (Status != SlotStatus.Available)
+        {
+            throw new InvalidOperationException("Only an available slot can be booked.");
+        }
+
+        Status = SlotStatus.Booked;
+    }
 }

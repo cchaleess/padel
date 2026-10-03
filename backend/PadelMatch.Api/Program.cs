@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using PadelMatch.Api.Auth;
 using PadelMatch.Api.Clubs;
+using PadelMatch.Api.Matches;
 using PadelMatch.Api.Players;
 using PadelMatch.Application;
 using PadelMatch.Infrastructure;
@@ -70,6 +71,7 @@ if (app.Environment.IsDevelopment())
 app.MapAuthEndpoints();
 app.MapPlayerEndpoints();
 app.MapClubEndpoints();
+app.MapMatchEndpoints();
 
 app.MapGet("/health/live", (TimeProvider clock) =>
         TypedResults.Ok(new HealthResponse("healthy", clock.GetUtcNow())))

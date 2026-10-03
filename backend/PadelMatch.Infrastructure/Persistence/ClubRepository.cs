@@ -15,6 +15,9 @@ internal sealed class ClubRepository(PadelMatchDbContext dbContext) : IClubRepos
     public async Task AddClubAsync(Club club, CancellationToken cancellationToken) =>
         await dbContext.Clubs.AddAsync(club, cancellationToken);
 
+    public Task<CourtSlot?> FindSlotByIdAsync(Guid slotId, CancellationToken cancellationToken) =>
+        dbContext.CourtSlots.FirstOrDefaultAsync(s => s.Id == slotId, cancellationToken);
+
     public async Task<IReadOnlyList<Court>> GetCourtsByClubIdAsync(Guid clubId, CancellationToken cancellationToken) =>
         await dbContext.Courts.Where(c => c.ClubId == clubId).ToListAsync(cancellationToken);
 

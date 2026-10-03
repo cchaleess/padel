@@ -26,4 +26,23 @@ public class CourtSlotTests
         Assert.Throws<ArgumentException>(() =>
             CourtSlot.Create(Guid.NewGuid(), DateTimeOffset.UtcNow, invalidDuration));
     }
+
+    [Fact]
+    public void BookTransitionsFromAvailableToBooked()
+    {
+        var slot = CourtSlot.Create(Guid.NewGuid(), DateTimeOffset.UtcNow, SlotDuration.SixtyMinutes);
+
+        slot.Book();
+
+        Assert.Equal(SlotStatus.Booked, slot.Status);
+    }
+
+    [Fact]
+    public void BookRejectsASlotThatIsNotAvailable()
+    {
+        var slot = CourtSlot.Create(Guid.NewGuid(), DateTimeOffset.UtcNow, SlotDuration.SixtyMinutes);
+        slot.Book();
+
+        Assert.Throws<InvalidOperationException>(slot.Book);
+    }
 }

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PadelMatch.Application;
 using PadelMatch.Application.Clubs;
+using PadelMatch.Application.Matches;
 using PadelMatch.Application.Players;
 using PadelMatch.Infrastructure.Auth;
 using PadelMatch.Infrastructure.Persistence;
@@ -21,6 +22,8 @@ public static class DependencyInjection
         services.AddScoped<IClubRepository, ClubRepository>();
         services.AddScoped<IClubDiscoveryService, ClubDiscoveryService>();
         services.AddScoped<IClubSubmissionService, ClubSubmissionService>();
+        services.AddScoped<IMatchRepository, MatchRepository>();
+        services.AddScoped<IMatchCreationService, MatchCreationService>();
 
         services.AddSingleton(authSettings);
         services.AddSingleton<IProviderIdentityVerifier, GoogleIdentityVerifier>();

@@ -12,6 +12,10 @@ public interface IClubRepository
 
     Task AddClubAsync(Club club, CancellationToken cancellationToken);
 
+    /// <summary>Loads a slot for a state transition (M3, <c>MatchCreationService</c>), tracked by the same
+    /// DbContext scope that also persists the new Match — see design.md "Exclusividad del CourtSlot".</summary>
+    Task<CourtSlot?> FindSlotByIdAsync(Guid slotId, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<Court>> GetCourtsByClubIdAsync(Guid clubId, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<CourtSlotWithCourtName>> GetSlotsAsync(
