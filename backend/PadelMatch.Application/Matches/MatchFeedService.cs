@@ -5,7 +5,8 @@ using PadelMatch.Domain.Matches;
 namespace PadelMatch.Application.Matches;
 
 public sealed class MatchFeedService(
-    IMatchRepository matchRepository, IPlayerRepository playerRepository, TimeProvider clock) : IMatchFeedService
+    IMatchRepository matchRepository, IMatchAccessRepository accessRepository, IPlayerRepository playerRepository,
+    TimeProvider clock) : IMatchFeedService
 {
     public async Task<MatchFeed> GetFeedAsync(
         Guid playerId, double? latitude, double? longitude, string? cityOrZoneOverride, CancellationToken cancellationToken)
@@ -13,11 +14,15 @@ public sealed class MatchFeedService(
         var matches = await matchRepository.FindJoinableUpcomingAsync(playerId, clock.GetUtcNow(), cancellationToken);
         var player = await playerRepository.FindByIdAsync(playerId, cancellationToken);
 
+        // "For you" means joinable directly: meeting the criteria (m6-quality-rules) or holding an approved request.
+        var approved = (await accessRepository.GetApprovedMatchIdsAsync(playerId, cancellationToken)).ToHashSet();
         var forYou = new List<MatchWithSlotDetails>();
         var outOfRange = new List<MatchWithSlotDetails>();
         foreach (var match in matches)
         {
-            (MatchCompatibility.IsCompatibleWithLevel(match.Match, player?.Level) ? forYou : outOfRange).Add(match);
+            var joinable = approved.Contains(match.Match.Id) ||
+                           MatchCompatibility.CanJoinDirectly(match.Match, player?.Level, player?.MatchesPlayed ?? 0);
+            (joinable ? forYou : outOfRange).Add(match);
         }
 
         string? effectiveCityOrZone = null;

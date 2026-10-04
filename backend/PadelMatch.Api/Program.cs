@@ -75,6 +75,7 @@ app.MapAuthEndpoints();
 app.MapPlayerEndpoints();
 app.MapClubEndpoints();
 app.MapMatchEndpoints();
+app.MapActivityEndpoints();
 
 app.MapGet("/health/live", (TimeProvider clock) =>
         TypedResults.Ok(new HealthResponse("healthy", clock.GetUtcNow())))

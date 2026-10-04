@@ -4,6 +4,8 @@ public interface IMatchSeatService
 {
     /// <exception cref="PlayerAlreadyHasSeatException"/>
     /// <exception cref="SeatUnavailableException"/>
+    /// <exception cref="AccessRequiresApprovalException">Outside a competitive match's criteria without an approved
+    /// exception request.</exception>
     /// <returns>When the hold expires.</returns>
     Task<DateTimeOffset> HoldSeatAsync(Guid matchId, Guid playerId, int? position, CancellationToken cancellationToken);
 

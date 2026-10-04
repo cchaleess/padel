@@ -1,9 +1,14 @@
+using PadelMatch.Application.Players;
 using PadelMatch.Domain.Matches;
 
 namespace PadelMatch.Application.Matches;
 
 public sealed class MatchSeatService(
-    IMatchSeatRepository seatRepository, IMatchRepository matchRepository, TimeProvider clock) : IMatchSeatService
+    IMatchSeatRepository seatRepository,
+    IMatchRepository matchRepository,
+    IMatchAccessRepository accessRepository,
+    IPlayerRepository playerRepository,
+    TimeProvider clock) : IMatchSeatService
 {
     public async Task<DateTimeOffset> HoldSeatAsync(
         Guid matchId, Guid playerId, int? position, CancellationToken cancellationToken)
@@ -20,6 +25,8 @@ public sealed class MatchSeatService(
             throw new PlayerAlreadyHasSeatException();
         }
 
+        await RequireAccessAsync(matchId, playerId, cancellationToken);
+
         var heldUntilUtc = now + MatchSeat.HoldDuration;
         if (!await seatRepository.TryHoldAsync(matchId, playerId, position, heldUntilUtc, now, cancellationToken))
         {
@@ -27,6 +34,29 @@ public sealed class MatchSeatService(
         }
 
         return heldUntilUtc;
+    }
+
+    /// <summary>Quality rules (plan §16, m6-quality-rules): outside a competitive match's criteria, holding a seat
+    /// needs an approved exception request. An unknown match is left to TryHoldAsync, which fails as unavailable.</summary>
+    private async Task RequireAccessAsync(Guid matchId, Guid playerId, CancellationToken cancellationToken)
+    {
+        if (await matchRepository.FindByIdAsync(matchId, cancellationToken) is not { } match)
+        {
+            return;
+        }
+
+        var player = await playerRepository.FindByIdAsync(playerId, cancellationToken);
+        var shortfalls = MatchCompatibility.GetShortfalls(match, player?.Level, player?.MatchesPlayed ?? 0);
+        if (shortfalls.Count == 0)
+        {
+            return;
+        }
+
+        var request = await accessRepository.FindRequestAsync(matchId, playerId, cancellationToken);
+        if (request?.Status != AccessRequestStatus.Approved)
+        {
+            throw new AccessRequiresApprovalException(shortfalls);
+        }
     }
 
     public async Task ConfirmSeatAsync(Guid matchId, Guid playerId, CancellationToken cancellationToken)

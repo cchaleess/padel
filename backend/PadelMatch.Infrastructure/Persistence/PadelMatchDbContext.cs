@@ -15,6 +15,8 @@ public sealed class PadelMatchDbContext(DbContextOptions<PadelMatchDbContext> op
     public DbSet<CourtSlot> CourtSlots => Set<CourtSlot>();
     public DbSet<Match> Matches => Set<Match>();
     public DbSet<MatchSeat> MatchSeats => Set<MatchSeat>();
+    public DbSet<MatchAccessRequest> MatchAccessRequests => Set<MatchAccessRequest>();
+    public DbSet<MatchAccessVote> MatchAccessVotes => Set<MatchAccessVote>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

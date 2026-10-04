@@ -164,6 +164,21 @@ POST /api/matches/{id}/release  [autenticado]
 - Retener/confirmar/soltar una plaza que ya no está en el estado esperado (agotadas, caducada reclamada por otro, no es la suya) devuelve 409, no un error genérico.
 - Sin pasarela de pago real todavía (simulado, arquitectura preparada para sustituirlo); sin abandonar una plaza ya `Confirmed` (depende de la lista de espera, M7).
 
+## Reglas de calidad (M6)
+
+En un partido competitivo, un jugador entra directamente si tiene nivel, su nivel está dentro del rango y ha jugado al menos el mínimo de partidos. Si no cumple algún criterio, retener plaza devuelve 403 con los motivos (`shortfalls`) y puede pedir acceso. La solicitud se aprueba cuando la aprueban **todos** los jugadores confirmados en ese momento; un solo rechazo la rechaza y es definitivo. Aprobada, el jugador se une como cualquiera: retiene y paga. Los amistosos no tienen criterios. Ver [design.md](specs/m6-quality-rules/design.md).
+
+```text
+POST /api/matches/{id}/exception-requests                      [autenticado] → 201
+POST /api/matches/{id}/exception-requests/{playerId}/approve   [confirmado]  → { status }
+POST /api/matches/{id}/exception-requests/{playerId}/reject    [confirmado]  → { status }
+GET  /api/activity                                             [autenticado] → { toVote, myRequests }
+```
+
+- Los votos a una solicitud se serializan con un bloqueo de fila (`SELECT ... FOR UPDATE`). Sin él, las dos últimas aprobaciones simultáneas podrían dejarla pendiente para siempre; hay un test que lo comprueba.
+- El detalle del partido incluye `myAccess` (si puedo unirme directamente, por qué no y el estado de mi solicitud) y, solo para confirmados, `pendingRequests`.
+- `MatchesPlayed` vale 0 hasta M10 (resultados), así que un competitivo con mínimo de partidos exige solicitud a todo el mundo por ahora.
+
 ## Simular otros jugadores (solo desarrollo)
 
 Casi todo lo que se prueba desde M5 necesita que *otro* jugador actúe. Con la API en `Development` existe `POST /api/dev/session { name }`, que entra como un jugador ficticio (se crea la primera vez y se reutiliza por nombre). Fuera de `Development` la ruta no existe. Ver [specs/dev-player-simulation](specs/dev-player-simulation/design.md).

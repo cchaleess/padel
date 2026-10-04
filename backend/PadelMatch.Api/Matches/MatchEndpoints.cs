@@ -13,7 +13,8 @@ public static class MatchEndpoints
 
         group.MapPost("", async Task<Results<Created<MatchDetailResponse>, ProblemHttpResult>> (
                 CreateMatchRequest request, ClaimsPrincipal user, IMatchCreationService creation,
-                IMatchRepository matches, IMatchSeatRepository seats, TimeProvider clock, CancellationToken cancellationToken) =>
+                IMatchRepository matches, IMatchSeatRepository seats, IMatchAccessService access, TimeProvider clock,
+                CancellationToken cancellationToken) =>
             {
                 try
                 {
@@ -27,8 +28,9 @@ public static class MatchEndpoints
                     // a single shape (m5-mobile-confirmation design.md).
                     var mySeat = await seats.FindActiveSeatAsync(match.Id, playerId, clock.GetUtcNow(), cancellationToken);
                     var confirmedPlayers = await seats.GetConfirmedPlayersAsync(match.Id, cancellationToken);
+                    var accessView = await access.GetAccessViewAsync(details.Match, playerId, cancellationToken);
                     return TypedResults.Created(
-                        $"/api/matches/{match.Id}", MatchDetailResponse.From(details, mySeat, confirmedPlayers));
+                        $"/api/matches/{match.Id}", MatchDetailResponse.From(details, mySeat, confirmedPlayers, accessView));
                 }
                 catch (CourtSlotNotFoundException ex)
                 {
@@ -61,15 +63,17 @@ public static class MatchEndpoints
 
         group.MapGet("/{id:guid}", async Task<Results<Ok<MatchDetailResponse>, ProblemHttpResult>> (
                 Guid id, ClaimsPrincipal user, IMatchRepository matches, IMatchSeatRepository seats,
-                TimeProvider clock, CancellationToken cancellationToken) =>
+                IMatchAccessService access, TimeProvider clock, CancellationToken cancellationToken) =>
             {
                 try
                 {
                     var details = await matches.FindDetailsByIdAsync(id, cancellationToken)
                         ?? throw new MatchNotFoundException(id);
-                    var mySeat = await seats.FindActiveSeatAsync(id, GetPlayerId(user), clock.GetUtcNow(), cancellationToken);
+                    var playerId = GetPlayerId(user);
+                    var mySeat = await seats.FindActiveSeatAsync(id, playerId, clock.GetUtcNow(), cancellationToken);
                     var confirmedPlayers = await seats.GetConfirmedPlayersAsync(id, cancellationToken);
-                    return TypedResults.Ok(MatchDetailResponse.From(details, mySeat, confirmedPlayers));
+                    var accessView = await access.GetAccessViewAsync(details.Match, playerId, cancellationToken);
+                    return TypedResults.Ok(MatchDetailResponse.From(details, mySeat, confirmedPlayers, accessView));
                 }
                 catch (MatchNotFoundException ex)
                 {
@@ -93,6 +97,13 @@ public static class MatchEndpoints
                 {
                     return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: ex.Message);
                 }
+                catch (AccessRequiresApprovalException ex)
+                {
+                    // The shortfalls tell the app why, so it can offer to request access (m6-quality-rules).
+                    return TypedResults.Problem(
+                        statusCode: StatusCodes.Status403Forbidden, title: ex.Message,
+                        extensions: new Dictionary<string, object?> { ["shortfalls"] = ex.Shortfalls.Select(s => s.ToString()).ToList() });
+                }
                 catch (PlayerAlreadyHasSeatException ex)
                 {
                     return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message);
@@ -105,6 +116,7 @@ public static class MatchEndpoints
             .WithName("HoldMatchSeat")
             .WithSummary("Claims one of the match's 4 seats for the authenticated player — the given position (0–1 pair A, 2–3 pair B) or any free one; held for 5 minutes.")
             .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapPost("/{id:guid}/confirm", async Task<Results<Ok, ProblemHttpResult>> (
@@ -140,7 +152,71 @@ public static class MatchEndpoints
             .WithName("ReleaseMatchSeat")
             .WithSummary("Releases the authenticated player's held seat back to Available before it expires.")
             .ProducesProblem(StatusCodes.Status409Conflict);
+        group.MapPost("/{id:guid}/exception-requests", async Task<Results<Created, ProblemHttpResult>> (
+                Guid id, ClaimsPrincipal user, IMatchAccessService access, CancellationToken cancellationToken) =>
+            {
+                var playerId = GetPlayerId(user);
+                try
+                {
+                    await access.RequestAccessAsync(id, playerId, cancellationToken);
+                    return TypedResults.Created($"/api/matches/{id}/exception-requests/{playerId}");
+                }
+                catch (MatchNotFoundException ex)
+                {
+                    return TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: ex.Message);
+                }
+                catch (Exception ex) when (ex is AccessRequestsClosedException or PlayerAlreadyHasSeatException
+                                               or AccessNotNeededException or AccessAlreadyRequestedException)
+                {
+                    return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message);
+                }
+            })
+            .WithName("RequestExceptionalJoin")
+            .WithSummary("Asks the match's confirmed players to let in a player who doesn't meet its quality criteria.")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        MapVote(group, "approve", approve: true);
+        MapVote(group, "reject", approve: false);
     }
+
+    /// <summary>Plan §37's route, keyed by the requester: one request per player and match.</summary>
+    private static void MapVote(RouteGroupBuilder group, string action, bool approve) =>
+        group.MapPost($"/{{id:guid}}/exception-requests/{{playerId:guid}}/{action}", async Task<Results<Ok<AccessVoteResponse>, ProblemHttpResult>> (
+                Guid id, Guid playerId, ClaimsPrincipal user, IMatchAccessService access, CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    var status = await access.VoteAsync(id, playerId, GetPlayerId(user), approve, cancellationToken);
+                    return TypedResults.Ok(new AccessVoteResponse(status));
+                }
+                catch (AccessRequestNotFoundException ex)
+                {
+                    return TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: ex.Message);
+                }
+                catch (NotAConfirmedPlayerException ex)
+                {
+                    return TypedResults.Problem(statusCode: StatusCodes.Status403Forbidden, title: ex.Message);
+                }
+                catch (Exception ex) when (ex is VoteAlreadyCastException or AccessRequestAlreadyResolvedException)
+                {
+                    return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message);
+                }
+            })
+            .WithName(approve ? "ApproveExceptionalJoin" : "RejectExceptionalJoin")
+            .WithSummary(approve
+                ? "A confirmed player approves an access request; it's approved once every confirmed player has."
+                : "A confirmed player rejects an access request; a single rejection rejects it.")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+    public static void MapActivityEndpoints(this WebApplication app) =>
+        app.MapGet("/api/activity", async (ClaimsPrincipal user, IMatchAccessService access, CancellationToken cancellationToken) =>
+                TypedResults.Ok(ActivityResponse.From(await access.GetActivityAsync(GetPlayerId(user), cancellationToken))))
+            .RequireAuthorization()
+            .WithName("GetActivity")
+            .WithSummary("The player's activity: access requests waiting for their vote, and their own requests.");
 
     private static Guid GetPlayerId(ClaimsPrincipal user) =>
         Guid.Parse(user.FindFirstValue(JwtRegisteredClaimNames.Sub)

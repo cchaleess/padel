@@ -24,10 +24,13 @@ public sealed record MatchDetailResponse(
     string? Note,
     int ConfirmedSeats,
     MySeatResponse? MySeat,
-    IReadOnlyList<ConfirmedPlayerResponse> ConfirmedPlayers)
+    IReadOnlyList<ConfirmedPlayerResponse> ConfirmedPlayers,
+    MyAccessResponse MyAccess,
+    IReadOnlyList<PendingAccessRequestResponse> PendingRequests)
 {
     public static MatchDetailResponse From(
-        MatchWithSlotDetails details, PlayerSeat? mySeat, IReadOnlyList<ConfirmedPlayer> confirmedPlayers) => new(
+        MatchWithSlotDetails details, PlayerSeat? mySeat, IReadOnlyList<ConfirmedPlayer> confirmedPlayers,
+        MatchAccessView access) => new(
         details.Match.Id,
         details.ClubId,
         details.ClubName,
@@ -46,8 +49,50 @@ public sealed record MatchDetailResponse(
         details.Match.Note,
         details.ConfirmedSeats,
         mySeat is null ? null : new MySeatResponse(mySeat.Position, mySeat.Status, mySeat.HeldUntilUtc),
-        confirmedPlayers.Select(p => new ConfirmedPlayerResponse(p.Position, p.PlayerId, p.DisplayName, p.Level)).ToList());
+        confirmedPlayers.Select(p => new ConfirmedPlayerResponse(p.Position, p.PlayerId, p.DisplayName, p.Level)).ToList(),
+        new MyAccessResponse(access.CanJoinDirectly, access.Shortfalls, access.RequestStatus),
+        access.PendingRequests.Select(r => new PendingAccessRequestResponse(
+            AccessRequesterResponse.From(r.Requester), r.Shortfalls, r.Approvals, r.VotersNeeded, r.MyVote)).ToList());
 }
+
+/// <summary>Whether the caller can hold a seat directly (m6-quality-rules) and, if not, why and how their
+/// exception request stands.</summary>
+public sealed record MyAccessResponse(
+    bool CanJoinDirectly, IReadOnlyList<AccessShortfall> Shortfalls, AccessRequestStatus? RequestStatus);
+
+/// <summary>Only filled for confirmed players, who are the ones voting.</summary>
+public sealed record PendingAccessRequestResponse(
+    AccessRequesterResponse Requester,
+    IReadOnlyList<AccessShortfall> Shortfalls,
+    int Approvals,
+    int VotersNeeded,
+    bool? MyVote);
+
+public sealed record AccessRequesterResponse(Guid PlayerId, string DisplayName, decimal? Level, int MatchesPlayed)
+{
+    public static AccessRequesterResponse From(AccessRequester r) => new(r.PlayerId, r.DisplayName, r.Level, r.MatchesPlayed);
+}
+
+public sealed record AccessVoteResponse(AccessRequestStatus Status);
+
+public sealed record ActivityResponse(
+    IReadOnlyList<RequestToVoteResponse> ToVote, IReadOnlyList<OwnRequestResponse> MyRequests)
+{
+    public static ActivityResponse From(AccessActivity activity) => new(
+        activity.ToVote.Select(t => new RequestToVoteResponse(
+            ActivityMatchResponse.From(t.Match), AccessRequesterResponse.From(t.Requester))).ToList(),
+        activity.MyRequests.Select(r => new OwnRequestResponse(ActivityMatchResponse.From(r.Match), r.Status)).ToList());
+}
+
+public sealed record ActivityMatchResponse(
+    Guid MatchId, string ClubName, DateTimeOffset StartsAt, DateTimeOffset EndsAt, MatchType Type)
+{
+    public static ActivityMatchResponse From(AccessMatchSummary m) => new(m.MatchId, m.ClubName, m.StartsAt, m.EndsAt, m.Type);
+}
+
+public sealed record RequestToVoteResponse(ActivityMatchResponse Match, AccessRequesterResponse Requester);
+
+public sealed record OwnRequestResponse(ActivityMatchResponse Match, AccessRequestStatus Status);
 
 /// <summary>Position 0–3: 0–1 are pair A, 2–3 pair B.</summary>
 public sealed record ConfirmedPlayerResponse(int Position, Guid PlayerId, string DisplayName, decimal? Level);
