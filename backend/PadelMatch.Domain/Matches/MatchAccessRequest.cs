@@ -4,7 +4,10 @@ public enum AccessRequestStatus
 {
     Pending,
     Approved,
-    Rejected
+    Rejected,
+
+    /// <summary>The match filled up before the vote ended (m6-mobile-quality-rules): there's no seat left to grant.</summary>
+    Expired
 }
 
 /// <summary>A player outside a competitive match's criteria asking to join anyway (plan §16, "solicitud
@@ -15,6 +18,12 @@ public sealed class MatchAccessRequest
     public Guid Id { get; private set; }
     public Guid MatchId { get; private set; }
     public Guid PlayerId { get; private set; }
+
+    /// <summary>The seat (0–3) the player asked from, so the app shows the request there and voters see which pair
+    /// they want (m6-mobile-quality-rules). Not a reservation: approval still only grants permission to join, and
+    /// the player may end up in another seat if that one is taken meanwhile. Null for requests without one.</summary>
+    public int? RequestedPosition { get; private set; }
+
     public AccessRequestStatus Status { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset? ResolvedAtUtc { get; private set; }
@@ -23,11 +32,14 @@ public sealed class MatchAccessRequest
     {
     }
 
-    public static MatchAccessRequest Create(Guid matchId, Guid playerId, DateTimeOffset nowUtc) => new()
+    public static MatchAccessRequest Create(Guid matchId, Guid playerId, int? requestedPosition, DateTimeOffset nowUtc) => new()
     {
         Id = Guid.NewGuid(),
         MatchId = matchId,
         PlayerId = playerId,
+        RequestedPosition = requestedPosition is { } position && !MatchSeat.IsValidPosition(position)
+            ? throw new ArgumentOutOfRangeException(nameof(requestedPosition), position, $"A seat position is 0–{MatchSeat.SeatsPerMatch - 1}.")
+            : requestedPosition,
         Status = AccessRequestStatus.Pending,
         CreatedAtUtc = nowUtc
     };

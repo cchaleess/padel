@@ -50,19 +50,24 @@ public sealed record MatchDetailResponse(
         details.ConfirmedSeats,
         mySeat is null ? null : new MySeatResponse(mySeat.Position, mySeat.Status, mySeat.HeldUntilUtc),
         confirmedPlayers.Select(p => new ConfirmedPlayerResponse(p.Position, p.PlayerId, p.DisplayName, p.Level)).ToList(),
-        new MyAccessResponse(access.CanJoinDirectly, access.Shortfalls, access.RequestStatus),
+        new MyAccessResponse(access.CanJoinDirectly, access.Shortfalls, access.RequestStatus, access.RequestedPosition),
         access.PendingRequests.Select(r => new PendingAccessRequestResponse(
-            AccessRequesterResponse.From(r.Requester), r.Shortfalls, r.Approvals, r.VotersNeeded, r.MyVote)).ToList());
+            AccessRequesterResponse.From(r.Requester), r.RequestedPosition, r.Shortfalls, r.Approvals, r.VotersNeeded, r.MyVote)).ToList());
 }
 
 /// <summary>Whether the caller can hold a seat directly (m6-quality-rules) and, if not, why and how their
 /// exception request stands.</summary>
 public sealed record MyAccessResponse(
-    bool CanJoinDirectly, IReadOnlyList<AccessShortfall> Shortfalls, AccessRequestStatus? RequestStatus);
+    bool CanJoinDirectly, IReadOnlyList<AccessShortfall> Shortfalls, AccessRequestStatus? RequestStatus,
+    int? RequestedPosition);
+
+/// <summary>Optional body for an exception request: the seat (0–3) the player asked from.</summary>
+public sealed record AccessRequestBody(int? Position);
 
 /// <summary>Only filled for confirmed players, who are the ones voting.</summary>
 public sealed record PendingAccessRequestResponse(
     AccessRequesterResponse Requester,
+    int? RequestedPosition,
     IReadOnlyList<AccessShortfall> Shortfalls,
     int Approvals,
     int VotersNeeded,

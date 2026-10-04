@@ -37,6 +37,6 @@ dev-sim.ps1 hold <matchId> [-Player Bruno] [-Position 0-3]  # retiene sin pagar 
 
 ## Mobile
 
-`LoginScreen`: con `__DEV__`, debajo del botón de Google, un bloque «Desarrollo» con tres botones (`Ana`, `Bruno`, `Carla`). Cada uno llama a `api.createDevSession(name)` y entra por el mismo camino que Google: `AuthContext` gana `signInAsDevPlayer`, que comparte con Google el guardado de sesión (`completeSignIn`).
+`LoginScreen`: con `__DEV__`, debajo del botón de Google, un bloque «Desarrollo» con cuatro botones (`Ana`, `Bruno`, `Carla`, `Diego`). Cada uno llama a `api.createDevSession(name)` y entra por el mismo camino que Google: `AuthContext` gana `signInAsDevPlayer`, que comparte con Google el guardado de sesión (`completeSignIn`).
 
 `__DEV__` es `false` en builds de release, así que el bloque y la llamada desaparecen ahí. En cualquier caso, el backend de producción no tiene la ruta.

@@ -1,4 +1,6 @@
 import type {
+  AccessRequestStatus,
+  Activity,
   AuthResponse,
   ClubDetail,
   ClubSummary,
@@ -140,6 +142,21 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(position === undefined ? {} : { position }),
     }),
+
+  /** Exceptional access to a competitive match outside my criteria (m6-quality-rules). */
+  requestAccess: (matchId: string, position: number) =>
+    request<void>(`/api/matches/${matchId}/exception-requests`, {
+      method: 'POST',
+      body: JSON.stringify({ position }),
+    }),
+
+  voteAccess: (matchId: string, playerId: string, approve: boolean) =>
+    request<{ status: AccessRequestStatus }>(
+      `/api/matches/${matchId}/exception-requests/${playerId}/${approve ? 'approve' : 'reject'}`,
+      { method: 'POST' },
+    ),
+
+  getActivity: () => request<Activity>('/api/activity'),
 
   confirmSeat: (matchId: string) => request<void>(`/api/matches/${matchId}/confirm`, { method: 'POST' }),
 

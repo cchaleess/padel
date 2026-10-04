@@ -71,6 +71,9 @@ public sealed class MatchSeatService(
         if (await seatRepository.CountConfirmedAsync(matchId, cancellationToken) == 4)
         {
             await matchRepository.MarkFullAsync(matchId, cancellationToken);
+            // No seat left to grant: pending exception requests expire now, so their players are told instead of
+            // waiting on a vote that can't help them (m6-mobile-quality-rules).
+            await accessRepository.ExpirePendingRequestsAsync(matchId, clock.GetUtcNow(), cancellationToken);
         }
     }
 

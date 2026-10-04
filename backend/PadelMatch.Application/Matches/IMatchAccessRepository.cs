@@ -32,6 +32,10 @@ public interface IMatchAccessRepository
     /// <summary>The player's own requests on upcoming matches, any status.</summary>
     Task<IReadOnlyList<OwnAccessRequest>> GetOwnRequestsAsync(Guid playerId, DateTimeOffset now, CancellationToken cancellationToken);
 
+    /// <summary>Closes every Pending request of the match as Expired, atomically (UPDATE ... WHERE Status =
+    /// 'Pending'). A vote holding the request's row lock finishes first; one arriving later finds it resolved.</summary>
+    Task ExpirePendingRequestsAsync(Guid matchId, DateTimeOffset now, CancellationToken cancellationToken);
+
     /// <exception cref="AccessAlreadyRequestedException">The (MatchId, PlayerId) unique index rejected a request.</exception>
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
@@ -43,7 +47,7 @@ public interface IAccessTransaction : IAsyncDisposable
 
 public sealed record AccessRequester(Guid PlayerId, string DisplayName, decimal? Level, int MatchesPlayed);
 
-public sealed record PendingAccessRequest(AccessRequester Requester, IReadOnlyList<MatchAccessVote> Votes);
+public sealed record PendingAccessRequest(AccessRequester Requester, int? RequestedPosition, IReadOnlyList<MatchAccessVote> Votes);
 
 public sealed record AccessMatchSummary(
     Guid MatchId, string ClubName, DateTimeOffset StartsAt, DateTimeOffset EndsAt, MatchType Type);

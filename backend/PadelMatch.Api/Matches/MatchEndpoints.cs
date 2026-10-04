@@ -153,17 +153,22 @@ public static class MatchEndpoints
             .WithSummary("Releases the authenticated player's held seat back to Available before it expires.")
             .ProducesProblem(StatusCodes.Status409Conflict);
         group.MapPost("/{id:guid}/exception-requests", async Task<Results<Created, ProblemHttpResult>> (
-                Guid id, ClaimsPrincipal user, IMatchAccessService access, CancellationToken cancellationToken) =>
+                Guid id, AccessRequestBody? body, ClaimsPrincipal user, IMatchAccessService access,
+                CancellationToken cancellationToken) =>
             {
                 var playerId = GetPlayerId(user);
                 try
                 {
-                    await access.RequestAccessAsync(id, playerId, cancellationToken);
+                    await access.RequestAccessAsync(id, playerId, body?.Position, cancellationToken);
                     return TypedResults.Created($"/api/matches/{id}/exception-requests/{playerId}");
                 }
                 catch (MatchNotFoundException ex)
                 {
                     return TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: ex.Message);
+                }
+                catch (ArgumentOutOfRangeException ex)
+                {
+                    return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: ex.Message);
                 }
                 catch (Exception ex) when (ex is AccessRequestsClosedException or PlayerAlreadyHasSeatException
                                                or AccessNotNeededException or AccessAlreadyRequestedException)
@@ -172,7 +177,8 @@ public static class MatchEndpoints
                 }
             })
             .WithName("RequestExceptionalJoin")
-            .WithSummary("Asks the match's confirmed players to let in a player who doesn't meet its quality criteria.")
+            .WithSummary("Asks the match's confirmed players to let in a player who doesn't meet its quality criteria, optionally from a given seat (0–3).")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 

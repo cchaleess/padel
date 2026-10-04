@@ -11,10 +11,13 @@
     .\scripts\dev-sim.ps1 create-match -Player Carla
     .\scripts\dev-sim.ps1 join 3f2b...-... -Count 2
     .\scripts\dev-sim.ps1 hold 3f2b...-... -Player Bruno -Position 2
+    .\scripts\dev-sim.ps1 create-match -Player Diego -Competitive -MinLevel 2.0 -MaxLevel 3.0
+    .\scripts\dev-sim.ps1 request 3f2b...-... -Player Ana
+    .\scripts\dev-sim.ps1 vote 3f2b...-... -Reject
 #>
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('create-match', 'join', 'hold')]
+    [ValidateSet('create-match', 'join', 'hold', 'request', 'vote')]
     [string]$Command,
 
     [Parameter(Position = 1)]
@@ -29,13 +32,22 @@ param(
     [ValidateRange(0, 3)]
     [Nullable[int]]$Position,
 
+    # `create-match`: a competitive match instead of a friendly one. The range defaults to the organizer's level ±0.5.
+    [switch]$Competitive,
+    [Nullable[decimal]]$MinLevel,
+    [Nullable[decimal]]$MaxLevel,
+
+    # `vote`: reject instead of approve. Without -Player, every fictional confirmed player votes.
+    [switch]$Reject,
+
     [string]$ApiBaseUrl = 'http://localhost:5080'
 )
 
 $ErrorActionPreference = 'Stop'
 
-# Pool used by `join`; skips any player who already has a seat in the match.
+# Pool used by `join`; skips any player who already has a seat in the match or can't join it directly.
 $JoinPool = @('Bruno', 'Carla', 'Diego', 'Elena', 'Fran', 'Gema', 'Hugo')
+$FictionalPlayers = @('Ana') + $JoinPool
 
 function Invoke-Api {
     param([string]$Method, [string]$Path, [string]$Token, $Body)
@@ -68,14 +80,16 @@ function Invoke-Api {
     }
 }
 
-function Get-DevToken([string]$Name) {
+function Get-DevSession([string]$Name) {
     try {
-        return (Invoke-Api -Method Post -Path '/api/dev/session' -Body @{ name = $Name }).sessionToken
+        return Invoke-Api -Method Post -Path '/api/dev/session' -Body @{ name = $Name }
     }
     catch {
         throw "No se pudo abrir sesión como '$Name'. ¿Está la API arrancada en Development en $ApiBaseUrl? ($($_.Exception.Message))"
     }
 }
+
+function Get-DevToken([string]$Name) { (Get-DevSession $Name).sessionToken }
 
 function Join-Match([string]$Id, [string]$Name) {
     $token = Get-DevToken $Name
@@ -91,7 +105,8 @@ function Require-MatchId {
 try {
     switch ($Command) {
         'create-match' {
-            $token = Get-DevToken $Player
+            $session = Get-DevSession $Player
+            $token = $session.sessionToken
             $now = [DateTimeOffset]::UtcNow.AddMinutes(1)
 
             $slot = $null
@@ -104,9 +119,14 @@ try {
             }
             if (-not $slot) { throw 'No hay ningún hueco libre en ningún club. ¿Seed caducado?' }
 
-            $match = Invoke-Api -Method Post -Path '/api/matches' -Token $token -Body @{
-                courtSlotId = $slot.id; type = 'Friendly'; note = "Partido simulado de $Player"
+            $body = @{ courtSlotId = $slot.id; type = 'Friendly'; note = "Partido simulado de $Player" }
+            if ($Competitive) {
+                $level = [decimal]$session.player.level
+                $body.type = 'Competitive'
+                $body.minLevel = if ($null -ne $MinLevel) { $MinLevel } else { [Math]::Max(1.0, $level - 0.5) }
+                $body.maxLevel = if ($null -ne $MaxLevel) { $MaxLevel } else { [Math]::Min(5.0, $level + 0.5) }
             }
+            $match = Invoke-Api -Method Post -Path '/api/matches' -Token $token -Body $body
             # The organizer's seat is born Held; paying it is what makes the match visible in others' feeds.
             Invoke-Api -Method Post -Path "/api/matches/$($match.id)/confirm" -Token $token | Out-Null
 
@@ -115,6 +135,7 @@ try {
             Write-Output "  id:      $($match.id)"
             Write-Output "  club:    $($club.name) · $($slot.courtName)"
             Write-Output "  horario: $($local.ToString('ddd dd/MM HH:mm'))"
+            if ($Competitive) { Write-Output "  tipo:    competitivo $($body.minLevel)–$($body.maxLevel) (nivel de $Player`: $($session.player.level))" }
             Write-Output "  plazas:  1/4"
         }
 
@@ -130,7 +151,11 @@ try {
                 }
                 catch {
                     $message = $_.Exception.Message
-                    # 409 on hold: this player already has a seat, or the match has none left.
+                    if ($message -match 'hold -> 403') {
+                    Write-Output "$name no cumple los criterios del partido; se salta"
+                    continue
+                }
+                # 409 on hold: this player already has a seat, or the match has none left.
                     if ($message -match 'hold -> 409') {
                         $detail = (Invoke-Api -Method Get -Path "/api/matches/$MatchId" -Token (Get-DevToken $name))
                         if ($detail.status -eq 'Full' -or $detail.mySeat -eq $null) {
@@ -144,6 +169,32 @@ try {
             }
             $final = Invoke-Api -Method Get -Path "/api/matches/$MatchId" -Token (Get-DevToken $JoinPool[0])
             Write-Output "Plazas confirmadas: $($final.confirmedSeats)/4 (estado: $($final.status))"
+        }
+
+        'request' {
+            Require-MatchId
+            Invoke-Api -Method Post -Path "/api/matches/$MatchId/exception-requests" -Token (Get-DevToken $Player) | Out-Null
+            Write-Output "$Player ha pedido acceso al partido"
+        }
+
+        'vote' {
+            Require-MatchId
+            $action = if ($Reject) { 'reject' } else { 'approve' }
+            $any = (Invoke-Api -Method Get -Path "/api/matches/$MatchId" -Token (Get-DevToken $FictionalPlayers[0]))
+            $voters = if ($PSBoundParameters.ContainsKey('Player')) { @($Player) } else {
+                @($any.confirmedPlayers | ForEach-Object { $_.displayName } | Where-Object { $FictionalPlayers -contains $_ })
+            }
+            if ($voters.Count -eq 0) { throw 'No hay jugadores ficticios confirmados en el partido que puedan votar.' }
+
+            foreach ($voter in $voters) {
+                $token = Get-DevToken $voter
+                # pendingRequests is only filled for confirmed players, so each voter reads it with their own session.
+                $detail = Invoke-Api -Method Get -Path "/api/matches/$MatchId" -Token $token
+                foreach ($request in $detail.pendingRequests) {
+                    $result = Invoke-Api -Method Post -Path "/api/matches/$MatchId/exception-requests/$($request.requester.playerId)/$action" -Token $token
+                    Write-Output "$voter vota $action a $($request.requester.displayName) -> $($result.status)"
+                }
+            }
         }
 
         'hold' {

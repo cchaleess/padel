@@ -178,6 +178,7 @@ GET  /api/activity                                             [autenticado] →
 - Los votos a una solicitud se serializan con un bloqueo de fila (`SELECT ... FOR UPDATE`). Sin él, las dos últimas aprobaciones simultáneas podrían dejarla pendiente para siempre; hay un test que lo comprueba.
 - El detalle del partido incluye `myAccess` (si puedo unirme directamente, por qué no y el estado de mi solicitud) y, solo para confirmados, `pendingRequests`.
 - `MatchesPlayed` vale 0 hasta M10 (resultados), así que un competitivo con mínimo de partidos exige solicitud a todo el mundo por ahora.
+- La solicitud guarda la plaza desde la que se pidió (`{ position }`), sin reservarla. Si el partido se completa mientras está pendiente, pasa a `Expired`.
 
 ## Simular otros jugadores (solo desarrollo)
 
@@ -190,9 +191,12 @@ Casi todo lo que se prueba desde M5 necesita que *otro* jugador actúe. Con la A
 .\scripts\dev-sim.ps1 create-match -Player Carla
 .\scripts\dev-sim.ps1 join <matchId> -Count 2       # 2 jugadores ficticios se unen y pagan
 .\scripts\dev-sim.ps1 hold <matchId> -Player Bruno -Position 2  # retiene la plaza 2 (pareja B) sin pagar (5 min)
+.\scripts\dev-sim.ps1 create-match -Player Diego -Competitive -MinLevel 2.3 -MaxLevel 3.3
+.\scripts\dev-sim.ps1 request <matchId> -Player Ana             # Ana pide acceso (fuera de criterios)
+.\scripts\dev-sim.ps1 vote <matchId> [-Reject] [-Player Bruno]  # los ficticios confirmados votan las solicitudes
 ```
 
-En un build de desarrollo de la app, la pantalla de login muestra además «Entrar como jugador de prueba» (Ana, Bruno, Carla) para ver la app desde la perspectiva de otro jugador.
+En un build de desarrollo de la app, la pantalla de login muestra además «Entrar como jugador de prueba» (Ana, Bruno, Carla, Diego) para ver la app desde la perspectiva de otro jugador.
 
 ## Cliente Expo
 
@@ -286,6 +290,10 @@ No requiere configuración adicional en `mobile/.env`. Sin acción de unirse tod
 El detalle de un partido muestra «N/4 confirmados» y una acción según tu plaza: «Unirme», «Continuar pago», «Tienes plaza confirmada» o «Partido completo». «Unirme» retiene una plaza y abre la pantalla de pago simulado con una cuenta atrás hasta el vencimiento que fija el servidor. «Pagar» confirma; «Cancelar», el botón atrás o el gesto de volver sueltan la plaza. Al crear un partido, el organizador llega directamente a esa pantalla. Las cards del feed muestran «N/4»; el feed empieza por los partidos propios (confirmados y pendientes de confirmación).
 
 Para probar como otro jugador, usa `scripts/dev-sim.ps1` o el login de prueba (ver «Simular otros jugadores»).
+
+### Reglas de calidad (M6, development build de Android)
+
+En un competitivo que no te incluye, el detalle explica por qué y las plazas vacías dicen «Solicitar acceso». Tocar una envía la solicitud, que se muestra en esa plaza. Los confirmados votan desde el detalle o desde la pestaña **Actividad**, que lista lo que tienes que votar y tus propias solicitudes, con un contador en la pestaña. Aprobada, «Unirme» vuelve a las plazas libres; rechazada o expirada, el detalle lo dice. El feed agrupa los partidos no unibles directamente bajo «Requieren aprobación».
 
 ## Verificación
 

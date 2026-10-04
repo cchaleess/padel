@@ -9,7 +9,8 @@ public interface IMatchAccessService
     /// <exception cref="PlayerAlreadyHasSeatException"/>
     /// <exception cref="AccessNotNeededException">The player already meets the criteria.</exception>
     /// <exception cref="AccessAlreadyRequestedException"/>
-    Task RequestAccessAsync(Guid matchId, Guid playerId, CancellationToken cancellationToken);
+    /// <exception cref="ArgumentOutOfRangeException">The requested position isn't 0–3.</exception>
+    Task RequestAccessAsync(Guid matchId, Guid playerId, int? requestedPosition, CancellationToken cancellationToken);
 
     /// <returns>The request's status after the vote.</returns>
     /// <exception cref="AccessRequestNotFoundException"/>
@@ -31,10 +32,12 @@ public sealed record MatchAccessView(
     bool CanJoinDirectly,
     IReadOnlyList<AccessShortfall> Shortfalls,
     AccessRequestStatus? RequestStatus,
+    int? RequestedPosition,
     IReadOnlyList<PendingAccessRequestView> PendingRequests);
 
 public sealed record PendingAccessRequestView(
     AccessRequester Requester,
+    int? RequestedPosition,
     IReadOnlyList<AccessShortfall> Shortfalls,
     int Approvals,
     int VotersNeeded,

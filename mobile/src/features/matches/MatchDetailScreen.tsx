@@ -1,12 +1,15 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ApiError, api } from '../../api/httpClient';
 import type { MatchDetail } from '../../api/types';
 import { useAuth } from '../auth/AuthContext';
+import { usePendingVotes } from '../activity/PendingVotesContext';
 import { colors, typography } from '../../theme';
 import { formatSlotSchedule } from '../clubs/slotFormatting';
+import AccessRequestCard from './AccessRequestCard';
+import { describeShortfall } from './accessLabels';
 import { getMatchTypeLabel } from './matchTypeLabel';
 
 type Props = { route: { params: { matchId: string } } };
@@ -27,38 +30,55 @@ export default function MatchDetailScreen({ route }: Props) {
   const { matchId } = route.params;
   const navigation = useNavigation<NativeStackNavigationProp<SeatFlowParamList>>();
   const { player } = useAuth();
+  const { refresh: refreshPendingVotes } = usePendingVotes();
   const [match, setMatch] = useState<MatchDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [joiningPosition, setJoiningPosition] = useState<number | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [requestingPosition, setRequestingPosition] = useState<number | null>(null);
+  const [accessError, setAccessError] = useState<string | null>(null);
+  const requestSeq = useRef(0);
+
+  // Only the latest load wins, so a reload after voting can't be overwritten by a slower earlier one.
+  const load = useCallback(async () => {
+    const seq = ++requestSeq.current;
+    try {
+      const loaded = await api.getMatchDetails(matchId);
+      if (seq === requestSeq.current) {
+        setMatch(loaded);
+        setError(null);
+      }
+    } catch {
+      if (seq === requestSeq.current) {
+        setError('No se ha podido cargar el partido.');
+      }
+    } finally {
+      if (seq === requestSeq.current) {
+        setIsLoading(false);
+      }
+    }
+  }, [matchId]);
 
   // Reloaded on every focus, so coming back from SeatPayment shows the seat's new state.
   useFocusEffect(
     useCallback(() => {
-      let isActive = true;
-      (async () => {
-        try {
-          const loaded = await api.getMatchDetails(matchId);
-          if (isActive) {
-            setMatch(loaded);
-            setError(null);
-          }
-        } catch {
-          if (isActive) {
-            setError('No se ha podido cargar el partido.');
-          }
-        } finally {
-          if (isActive) {
-            setIsLoading(false);
-          }
-        }
-      })();
-      return () => {
-        isActive = false;
-      };
-    }, [matchId]),
+      void load();
+    }, [load]),
   );
+
+  const requestAccess = async (position: number) => {
+    setRequestingPosition(position);
+    setAccessError(null);
+    try {
+      await api.requestAccess(matchId, position);
+      await load();
+    } catch (e) {
+      setAccessError(e instanceof ApiError ? e.message : 'No se ha podido enviar la solicitud.');
+    } finally {
+      setRequestingPosition(null);
+    }
+  };
 
   const join = async (position: number) => {
     setJoiningPosition(position);
@@ -81,7 +101,83 @@ export default function MatchDetailScreen({ route }: Props) {
     return <Text style={styles.error}>{error ?? 'Partido no encontrado.'}</Text>;
   }
 
-  const canJoin = match.status === 'Open' && match.mySeat === null;
+  // Quality rules (m6-quality-rules): outside a competitive match's criteria, joining needs an approved request.
+  const hasAccess = match.myAccess.canJoinDirectly || match.myAccess.requestStatus === 'Approved';
+  const canJoin = match.status === 'Open' && match.mySeat === null && hasAccess;
+  const range = { minLevel: match.minLevel, maxLevel: match.maxLevel, minMatchesRequired: match.minMatchesRequired };
+
+  const renderAccess = () => {
+    const status = match.myAccess.requestStatus;
+    if (status === 'Expired' && match.mySeat === null) {
+      return (
+        <View style={[styles.section, styles.accessBox]}>
+          <Text style={[styles.accessStatus, styles.rejected]}>
+            El partido se completó antes de que se votara tu solicitud.
+          </Text>
+        </View>
+      );
+    }
+    if (hasAccess || match.mySeat !== null || match.status !== 'Open') {
+      return null;
+    }
+
+    // The request isn't a reservation: someone who meets the criteria may take that seat while the vote is open.
+    const requestedSeatTaken =
+      match.myAccess.requestedPosition != null &&
+      match.confirmedPlayers.some((p) => p.position === match.myAccess.requestedPosition);
+    return (
+      <View style={[styles.section, styles.accessBox]}>
+        <Text style={styles.sectionTitle}>Requiere aprobación</Text>
+        {match.myAccess.shortfalls.map((s) => (
+          <Text key={s} style={typography.note}>
+            · {describeShortfall(s, range, 'me')}
+            {s === 'LevelBelowRange' || s === 'LevelAboveRange' ? ` (tu nivel: ${player?.level?.toFixed(1)})` : ''}
+          </Text>
+        ))}
+        {status === 'Pending' ? (
+          <>
+            <Text style={styles.accessStatus}>Solicitud enviada. Esperando a que voten los jugadores confirmados.</Text>
+            {requestedSeatTaken ? (
+              <Text style={[typography.note, styles.accessHint]}>
+                La plaza que pediste ya está ocupada; si te aprueban podrás elegir otra libre.
+              </Text>
+            ) : null}
+          </>
+        ) : status === 'Rejected' ? (
+          <Text style={[styles.accessStatus, styles.rejected]}>Tu solicitud fue rechazada.</Text>
+        ) : (
+          <Text style={[typography.note, styles.accessHint]}>
+            Toca una plaza vacía para solicitar acceso: entrarás si lo aprueban todos los jugadores confirmados.
+          </Text>
+        )}
+        {accessError ? <Text style={styles.joinError}>{accessError}</Text> : null}
+      </View>
+    );
+  };
+
+  const renderPendingRequests = () =>
+    match.pendingRequests.length === 0 ? null : (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Solicitudes de acceso</Text>
+        {match.pendingRequests.map((r) => (
+          <AccessRequestCard
+            key={r.requester.playerId}
+            matchId={matchId}
+            requester={r.requester}
+            details={[
+              ...(r.requestedPosition != null ? [`Quiere jugar en la ${r.requestedPosition < 2 ? 'pareja A' : 'pareja B'}`] : []),
+              ...r.shortfalls.map((s) => describeShortfall(s, range, 'them')),
+            ]}
+            progress={`${r.approvals}/${r.votersNeeded} aprobaciones`}
+            myVote={r.myVote}
+            onVoted={() => {
+              void load();
+              void refreshPendingVotes();
+            }}
+          />
+        ))}
+      </View>
+    );
 
   const renderSeat = (position: number) => {
     const seatPlayer = match.confirmedPlayers.find((p) => p.position === position);
@@ -115,6 +211,33 @@ export default function MatchDetailScreen({ route }: Props) {
           <Text style={styles.seatTags} numberOfLines={1}>
             Tú · pendiente de pago
           </Text>
+        </View>
+      );
+    }
+
+    // Outside the criteria (m6-quality-rules), an empty seat is where the player asks for access, and the request
+    // shows on that seat only. It isn't a reservation: once approved, they join whichever seat is free.
+    const needsAccess = match.status === 'Open' && match.mySeat === null && !hasAccess;
+    if (needsAccess && match.myAccess.requestStatus === null) {
+      const isRequestingThis = requestingPosition === position;
+      return (
+        <Pressable
+          key={position}
+          accessibilityRole="button"
+          disabled={requestingPosition !== null}
+          style={[styles.seat, styles.seatFree, requestingPosition !== null && !isRequestingThis && styles.buttonDisabled]}
+          onPress={() => requestAccess(position)}>
+          <Text style={styles.seatJoin}>{isRequestingThis ? 'Enviando...' : 'Solicitar acceso'}</Text>
+        </Pressable>
+      );
+    }
+    if (needsAccess && match.myAccess.requestStatus === 'Pending' && match.myAccess.requestedPosition === position) {
+      return (
+        <View key={position} style={[styles.seat, styles.seatMine]}>
+          <Text style={styles.seatName} numberOfLines={1}>
+            {player?.displayName ?? 'Tú'}
+          </Text>
+          <Text style={styles.seatTags}>Solicitud enviada</Text>
         </View>
       );
     }
@@ -181,16 +304,19 @@ export default function MatchDetailScreen({ route }: Props) {
           </Pressable>
         ) : match.status === 'Full' ? (
           <Text style={styles.statusText}>Partido completo</Text>
-        ) : (
+        ) : canJoin ? (
           <Text style={typography.note}>Elige una plaza libre para unirte a una de las dos parejas.</Text>
-        )}
+        ) : null}
       </View>
+
+      {renderAccess()}
+      {renderPendingRequests()}
 
       {match.type === 'Competitive' ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Nivel</Text>
           <Text style={typography.note}>
-            Rango {match.minLevel} – {match.maxLevel} (tu nivel al crear: {match.organizerLevelAtCreation})
+            Rango {match.minLevel} – {match.maxLevel}
           </Text>
           {match.minMatchesRequired != null ? (
             <Text style={typography.note}>Mínimo {match.minMatchesRequired} partidos jugados</Text>
@@ -217,6 +343,10 @@ const styles = StyleSheet.create({
   section: { marginTop: 20 },
   sectionTitle: { ...typography.note, fontWeight: '700', marginBottom: 6 },
   statusText: { fontSize: 16, fontWeight: '700', color: colors.ink },
+  accessBox: { borderWidth: 1, borderColor: '#D8D5C4', borderRadius: 12, padding: 14 },
+  accessHint: { marginTop: 8 },
+  accessStatus: { marginTop: 8, color: colors.ink, fontSize: 15, fontWeight: '600' },
+  rejected: { color: '#B3261E' },
   seat: {
     minHeight: 84,
     justifyContent: 'center',

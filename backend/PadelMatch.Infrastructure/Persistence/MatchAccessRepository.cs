@@ -46,7 +46,7 @@ internal sealed class MatchAccessRepository(PadelMatchDbContext dbContext) : IMa
             .Where(r => r.MatchId == matchId && r.Status == AccessRequestStatus.Pending)
             .Join(dbContext.Players, r => r.PlayerId, p => p.Id, (r, p) => new
             {
-                r.Id, r.CreatedAtUtc, p.DisplayName, PlayerId = p.Id, p.Level, p.MatchesPlayed
+                r.Id, r.CreatedAtUtc, r.RequestedPosition, p.DisplayName, PlayerId = p.Id, p.Level, p.MatchesPlayed
             })
             .OrderBy(x => x.CreatedAtUtc)
             .ToListAsync(cancellationToken);
@@ -57,6 +57,7 @@ internal sealed class MatchAccessRepository(PadelMatchDbContext dbContext) : IMa
         return requests
             .Select(r => new PendingAccessRequest(
                 new AccessRequester(r.PlayerId, r.DisplayName, r.Level, r.MatchesPlayed),
+                r.RequestedPosition,
                 votes.Where(v => v.RequestId == r.Id).ToList()))
             .ToList();
     }
@@ -95,6 +96,14 @@ internal sealed class MatchAccessRepository(PadelMatchDbContext dbContext) : IMa
             .Select(x => new OwnAccessRequest(new AccessMatchSummary(x.MatchId, x.ClubName, x.StartsAt, x.EndsAt, x.Type), x.Status))
             .ToList();
     }
+
+    public async Task ExpirePendingRequestsAsync(Guid matchId, DateTimeOffset now, CancellationToken cancellationToken) =>
+        await dbContext.MatchAccessRequests
+            .Where(r => r.MatchId == matchId && r.Status == AccessRequestStatus.Pending)
+            .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(r => r.Status, AccessRequestStatus.Expired)
+                    .SetProperty(r => r.ResolvedAtUtc, now),
+                cancellationToken);
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken)
     {

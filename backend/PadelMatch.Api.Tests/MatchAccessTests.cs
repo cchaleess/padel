@@ -84,6 +84,23 @@ public sealed class MatchAccessTests : PlayerApiTestBase
     }
 
     [Fact]
+    public async Task TheRequestedSeatIsShownToTheRequesterAndTheVoters()
+    {
+        var match = await CreateMatchAsync(MatchType.Competitive);
+        using var player = await NewPlayerAsync(Beginner);
+
+        var response = await player.Client.PostAsJsonAsync(
+            $"/api/matches/{match.Id}/exception-requests", new AccessRequestBody(3), JsonOptions);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(3, (await GetDetailAsync(player, match.Id)).MyAccess.RequestedPosition);
+        Assert.Equal(3, Assert.Single((await GetDetailAsync(Organizer, match.Id)).PendingRequests).RequestedPosition);
+        using var other = await NewPlayerAsync(Beginner);
+        Assert.Equal(HttpStatusCode.BadRequest, (await other.Client.PostAsJsonAsync(
+            $"/api/matches/{match.Id}/exception-requests", new AccessRequestBody(7), JsonOptions)).StatusCode);
+    }
+
+    [Fact]
     public async Task APlayerWhoCanJoinDirectlyCannotRequest()
     {
         var match = await CreateMatchAsync(MatchType.Competitive);
@@ -175,6 +192,24 @@ public sealed class MatchAccessTests : PlayerApiTestBase
         // The row lock serializes them: the first sees one approval (Pending), the second sees both (Approved).
         Assert.Contains(statuses, s => s!.Status == AccessRequestStatus.Approved);
         Assert.Equal(AccessRequestStatus.Approved, (await GetDetailAsync(requester, match.Id)).MyAccess.RequestStatus);
+    }
+
+    [Fact]
+    public async Task APendingRequestExpiresWhenTheMatchFillsUp()
+    {
+        var match = await CreateMatchAsync(MatchType.Competitive);
+        using var requester = await NewPlayerAsync(Beginner);
+        await RequestAsync(requester, match.Id);
+
+        // Three players who meet the criteria take the remaining seats before anyone votes.
+        using var second = await JoinAsync(match.Id, InRange);
+        using var third = await JoinAsync(match.Id, InRange);
+        using var fourth = await JoinAsync(match.Id, InRange);
+
+        Assert.Equal(AccessRequestStatus.Expired, (await GetDetailAsync(requester, match.Id)).MyAccess.RequestStatus);
+        Assert.Equal(AccessRequestStatus.Expired, Assert.Single((await GetActivityAsync(requester)).MyRequests).Status);
+        Assert.Empty((await GetActivityAsync(Organizer)).ToVote);
+        Assert.Equal(HttpStatusCode.Conflict, (await VoteAsync(Organizer, match.Id, requester.Id, approve: true)).StatusCode);
     }
 
     [Fact]

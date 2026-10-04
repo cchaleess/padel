@@ -12,7 +12,8 @@ public sealed class MatchAccessService(
     IPlayerRepository playerRepository,
     TimeProvider clock) : IMatchAccessService
 {
-    public async Task RequestAccessAsync(Guid matchId, Guid playerId, CancellationToken cancellationToken)
+    public async Task RequestAccessAsync(
+        Guid matchId, Guid playerId, int? requestedPosition, CancellationToken cancellationToken)
     {
         var now = clock.GetUtcNow();
         var details = await matchRepository.FindDetailsByIdAsync(matchId, cancellationToken)
@@ -39,7 +40,7 @@ public sealed class MatchAccessService(
             throw new AccessAlreadyRequestedException();
         }
 
-        await accessRepository.AddRequestAsync(MatchAccessRequest.Create(matchId, playerId, now), cancellationToken);
+        await accessRepository.AddRequestAsync(MatchAccessRequest.Create(matchId, playerId, requestedPosition, now), cancellationToken);
         await accessRepository.SaveChangesAsync(cancellationToken);
     }
 
@@ -110,6 +111,7 @@ public sealed class MatchAccessService(
             pending = (await accessRepository.GetPendingRequestsAsync(match.Id, cancellationToken))
                 .Select(r => new PendingAccessRequestView(
                     r.Requester,
+                    r.RequestedPosition,
                     MatchCompatibility.GetShortfalls(match, r.Requester.Level, r.Requester.MatchesPlayed),
                     r.Votes.Count(v => v.Approve && confirmedIds.Contains(v.VoterId)),
                     confirmedIds.Count,
@@ -117,7 +119,7 @@ public sealed class MatchAccessService(
                 .ToList();
         }
 
-        return new MatchAccessView(shortfalls.Count == 0, shortfalls, ownRequest?.Status, pending);
+        return new MatchAccessView(shortfalls.Count == 0, shortfalls, ownRequest?.Status, ownRequest?.RequestedPosition, pending);
     }
 
     public async Task<AccessActivity> GetActivityAsync(Guid playerId, CancellationToken cancellationToken)

@@ -5,7 +5,7 @@ import { colors, typography } from '../../theme';
 import { useAuth } from './AuthContext';
 import { useGoogleSignIn } from './useGoogleSignIn';
 
-const DEV_PLAYERS = ['Ana', 'Bruno', 'Carla'];
+const DEV_PLAYERS = ['Ana', 'Bruno', 'Carla', 'Diego'];
 
 /** Development builds only: sign in as a fictional player to see the app as someone else
  * (specs/dev-player-simulation). The backend route doesn't exist outside Development either. */

@@ -48,7 +48,8 @@ export default function FeedScreen({ navigation }: Props) {
         nextSections.push({ title: 'Partidos para ti', data: feed.forYou });
       }
       if (feed.outOfRange.length > 0) {
-        nextSections.push({ title: 'Otros partidos cercanos', data: feed.outOfRange });
+        // Plan §13: the ones the player can't join directly need the confirmed players' approval.
+        nextSections.push({ title: 'Requieren aprobación', data: feed.outOfRange });
       }
       setSections(nextSections);
       setError(null);

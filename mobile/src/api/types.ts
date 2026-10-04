@@ -113,6 +113,53 @@ export interface MatchDetail {
   mySeat: MySeat | null;
   /** Ordered by position. Held seats aren't included (plan §11). */
   confirmedPlayers: ConfirmedPlayer[];
+  myAccess: MyAccess;
+  /** Only filled when I'm a confirmed player: I'm one of the voters. */
+  pendingRequests: PendingAccessRequest[];
+}
+
+/** Why a player can't join a competitive match directly (m6-quality-rules). */
+export type AccessShortfall = 'NoLevel' | 'LevelBelowRange' | 'LevelAboveRange' | 'NotEnoughMatches';
+
+/** Expired: the match filled up before the vote ended. */
+export type AccessRequestStatus = 'Pending' | 'Approved' | 'Rejected' | 'Expired';
+
+export interface MyAccess {
+  canJoinDirectly: boolean;
+  shortfalls: AccessShortfall[];
+  requestStatus: AccessRequestStatus | null;
+  /** The seat I asked from (0–3); shown there while the request is open. */
+  requestedPosition: number | null;
+}
+
+export interface AccessRequester {
+  playerId: string;
+  displayName: string;
+  level: number | null;
+  matchesPlayed: number;
+}
+
+export interface PendingAccessRequest {
+  requester: AccessRequester;
+  /** 0–1 pair A, 2–3 pair B. */
+  requestedPosition: number | null;
+  shortfalls: AccessShortfall[];
+  approvals: number;
+  votersNeeded: number;
+  myVote: boolean | null;
+}
+
+export interface ActivityMatch {
+  matchId: string;
+  clubName: string;
+  startsAt: string;
+  endsAt: string;
+  type: MatchType;
+}
+
+export interface Activity {
+  toVote: { match: ActivityMatch; requester: AccessRequester }[];
+  myRequests: { match: ActivityMatch; status: AccessRequestStatus }[];
 }
 
 export interface ConfirmedPlayer {
