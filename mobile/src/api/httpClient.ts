@@ -8,6 +8,7 @@ import type {
   MatchDetail,
   MatchFeed,
   PlayerProfile,
+  SeatHold,
   SubmitClubRequest,
   UpdateProfileRequest,
 } from './types';
@@ -58,11 +59,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new ApiError(response.status, problem?.title ?? `Error ${response.status}`);
   }
 
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return (await response.json()) as T;
+  // Some endpoints answer 200 with no body (e.g. seat confirm/release), so json() would throw on them.
+  const text = await response.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 export const api = {
@@ -127,4 +126,15 @@ export const api = {
     const suffix = query.toString();
     return request<MatchFeed>(`/api/matches/feed${suffix ? `?${suffix}` : ''}`);
   },
+
+  /** `position` 0–3 picks the seat (0–1 pair A, 2–3 pair B); omitted, the backend picks any free one. */
+  holdSeat: (matchId: string, position?: number) =>
+    request<SeatHold>(`/api/matches/${matchId}/hold`, {
+      method: 'POST',
+      body: JSON.stringify(position === undefined ? {} : { position }),
+    }),
+
+  confirmSeat: (matchId: string) => request<void>(`/api/matches/${matchId}/confirm`, { method: 'POST' }),
+
+  releaseSeat: (matchId: string) => request<void>(`/api/matches/${matchId}/release`, { method: 'POST' }),
 };

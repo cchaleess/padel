@@ -42,6 +42,11 @@ export interface ClubSummary {
   cityOrZone: string | null;
   status: ClubStatus;
   distanceKm: number | null;
+  confirmedSeats: number;
+}
+
+export interface SeatHold {
+  heldUntilUtc: string;
 }
 
 export interface Court {
@@ -75,7 +80,17 @@ export interface SubmitClubRequest {
 
 export type MatchType = 'Competitive' | 'Friendly';
 
-export type MatchStatus = 'Open';
+export type MatchStatus = 'Open' | 'Full';
+
+/** Only an active seat reaches mobile: an expired Held comes back as `mySeat: null`. */
+export type SeatStatus = 'Held' | 'Confirmed';
+
+export interface MySeat {
+  /** 0–3: 0–1 pair A, 2–3 pair B. */
+  position: number;
+  status: SeatStatus;
+  heldUntilUtc: string | null;
+}
 
 export interface MatchDetail {
   id: string;
@@ -94,6 +109,18 @@ export interface MatchDetail {
   maxLevel: number | null;
   minMatchesRequired: number | null;
   note: string | null;
+  confirmedSeats: number;
+  mySeat: MySeat | null;
+  /** Ordered by position. Held seats aren't included (plan §11). */
+  confirmedPlayers: ConfirmedPlayer[];
+}
+
+export interface ConfirmedPlayer {
+  /** 0–3: 0–1 pair A, 2–3 pair B. */
+  position: number;
+  playerId: string;
+  displayName: string;
+  level: number | null;
 }
 
 export interface CreateMatchRequest {
@@ -117,9 +144,18 @@ export interface MatchFeedItem {
   minLevel: number | null;
   maxLevel: number | null;
   distanceKm: number | null;
+  confirmedSeats: number;
+}
+
+export interface SeatHold {
+  heldUntilUtc: string;
 }
 
 export interface MatchFeed {
+  /** My upcoming full matches (4/4 confirmed). */
+  confirmed: MatchFeedItem[];
+  /** My upcoming matches where I'm confirmed but the match isn't full yet. */
+  pendingConfirmation: MatchFeedItem[];
   forYou: MatchFeedItem[];
   outOfRange: MatchFeedItem[];
 }

@@ -150,13 +150,15 @@ GET /api/matches/feed?lat=&lng=&cityOrZone=   [autenticado]
 
 ## Confirmación de plaza (M5)
 
-Cada `Match` nace con 4 `MatchSeat` (`Available`), incluso para el organizador — crear el partido sigue sin ocupar ninguna plaza. Un jugador retiene una plaza (`Held`, expira a los 5 minutos sin que haga falta ningún proceso en segundo plano: la expiración se resuelve perezosamente, en el momento en que alguien vuelve a intentar reclamar esa plaza), la confirma (pago simulado, éxito inmediato) o la suelta antes de que expire. Al confirmarse la cuarta, el `Match` pasa a `Full` y deja de aparecer en el feed. Ver [design.md](specs/m5-confirmation/design.md) para el mecanismo de concurrencia (`ExecuteUpdateAsync` condicionado, sin cargar-mutar-guardar).
+Cada `Match` nace con 4 `MatchSeat`: la del organizador ya `Held` (crear lleva directamente al pago, ver [m5-mobile-confirmation](specs/m5-mobile-confirmation/proposal.md)) y las otras 3 `Available`. Nadie, ni el organizador, ocupa plaza hasta pagar. Un jugador retiene una plaza (`Held`, expira a los 5 minutos sin que haga falta ningún proceso en segundo plano: la expiración se resuelve perezosamente, en el momento en que alguien vuelve a intentar reclamar esa plaza), la confirma (pago simulado, éxito inmediato) o la suelta antes de que expire. Al confirmarse la cuarta, el `Match` pasa a `Full` y deja de aparecer en el feed. El feed tiene cuatro secciones: los partidos propios completos («Tienes estas partidas confirmadas»), los propios aún abiertos («Partidas pendientes de confirmación») y, después, los partidos a los que el jugador puede unirse (con al menos 1 confirmado, no organizados por él y sin plaza activa suya) en «Partidos para ti» y «Otros partidos cercanos». Ver [design.md](specs/m5-confirmation/design.md) para el mecanismo de concurrencia (`ExecuteUpdateAsync` condicionado, sin cargar-mutar-guardar).
 
 ```text
 POST /api/matches/{id}/hold     [autenticado] → { heldUntilUtc }
 POST /api/matches/{id}/confirm  [autenticado]
 POST /api/matches/{id}/release  [autenticado]
 ```
+
+`GET /api/matches/{id}` incluye `confirmedSeats` (solo `Confirmed`; las `Held` de otros no se muestran) y `mySeat` (`{ status, heldUntilUtc }` o `null`). Los items del feed incluyen `confirmedSeats`.
 
 - Un jugador no puede tener dos plazas activas (`Held` no caducada, o `Confirmed`) en el mismo partido; un índice único parcial en `MatchSeats` es el backstop ante concurrencia.
 - Retener/confirmar/soltar una plaza que ya no está en el estado esperado (agotadas, caducada reclamada por otro, no es la suya) devuelve 409, no un error genérico.
@@ -248,6 +250,10 @@ No requiere configuración adicional en `mobile/.env`. Límite conocido y docume
 La pestaña `Partidos` arranca ahora en su propio segmento (antes `Clubes` por defecto): al entrar, el jugador ve directamente el feed de `GET /api/matches/feed`, sin tocar nada — mismo permiso de ubicación opcional que el catálogo de clubes. Dos secciones, "Partidos para ti" y "Otros partidos cercanos" (se omite la que esté vacía); cada card muestra club, horario y tipo, y el rango de nivel si es `Competitive`. El feed se recarga solo al entrar/volver a la pestaña, y también con el gesto de deslizar hacia abajo. Tocar una card navega al detalle ya existente del partido (`m3-mobile-matches`), reutilizado tal cual.
 
 No requiere configuración adicional en `mobile/.env`. Sin acción de unirse todavía (M5), sin calidad estimada ni contador de confirmados (el backend no los expone, ver [m4-discovery](specs/m4-discovery/design.md)).
+
+### Confirmación de plaza (M5, development build de Android)
+
+El detalle de un partido muestra «N/4 confirmados» y una acción según tu plaza: «Unirme», «Continuar pago», «Tienes plaza confirmada» o «Partido completo». «Unirme» retiene una plaza y abre la pantalla de pago simulado con una cuenta atrás hasta el vencimiento que fija el servidor. «Pagar» confirma; «Cancelar», el botón atrás o el gesto de volver sueltan la plaza. Al crear un partido, el organizador llega directamente a esa pantalla. Las cards del feed muestran «N/4»; el feed empieza por los partidos propios (confirmados y pendientes de confirmación).
 
 ## Verificación
 

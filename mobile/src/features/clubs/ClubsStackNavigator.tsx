@@ -4,6 +4,7 @@ import ClubDetailScreen from './ClubDetailScreen';
 import SubmitClubScreen from './SubmitClubScreen';
 import CreateMatchScreen from '../matches/CreateMatchScreen';
 import MatchDetailScreen from '../matches/MatchDetailScreen';
+import SeatPaymentScreen from '../matches/SeatPaymentScreen';
 
 export type ClubsStackParamList = {
   ClubsList: undefined;
@@ -11,6 +12,7 @@ export type ClubsStackParamList = {
   SubmitClub: undefined;
   CreateMatch: { courtSlotId: string; courtName: string; startsAt: string; endsAt: string; durationMinutes: number };
   MatchDetail: { matchId: string };
+  SeatPayment: { matchId: string; heldUntilUtc: string };
 };
 
 const Stack = createNativeStackNavigator<ClubsStackParamList>();
@@ -23,6 +25,7 @@ export default function ClubsStackNavigator() {
       <Stack.Screen name="SubmitClub" component={SubmitClubScreen} options={{ title: 'Aportar un club' }} />
       <Stack.Screen name="CreateMatch" component={CreateMatchScreen} options={{ title: 'Crear partido' }} />
       <Stack.Screen name="MatchDetail" component={MatchDetailScreen} options={{ title: 'Partido' }} />
+      <Stack.Screen name="SeatPayment" component={SeatPaymentScreen} options={{ title: 'Confirmar plaza' }} />
     </Stack.Navigator>
   );
 }

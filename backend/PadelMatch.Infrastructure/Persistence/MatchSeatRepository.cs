@@ -19,16 +19,19 @@ internal sealed class MatchSeatRepository(PadelMatchDbContext dbContext) : IMatc
             cancellationToken);
 
     public async Task<bool> TryHoldAsync(
-        Guid matchId, Guid playerId, DateTimeOffset heldUntilUtc, DateTimeOffset now, CancellationToken cancellationToken)
+        Guid matchId, Guid playerId, int? position, DateTimeOffset heldUntilUtc, DateTimeOffset now,
+        CancellationToken cancellationToken)
     {
         // Each attempt re-reads the candidates: a seat another request just claimed drops out of the next pick
-        // (design.md, "si el UPDATE afecta 0 filas ... se reintenta una vez sobre la siguiente candidata").
-        for (var attempt = 0; attempt < MaxHoldAttempts; attempt++)
+        // (design.md, "si el UPDATE afecta 0 filas ... se reintenta una vez sobre la siguiente candidata"). A
+        // requested position has a single candidate, so losing that race means the seat isn't available.
+        var attempts = position is null ? MaxHoldAttempts : 1;
+        for (var attempt = 0; attempt < attempts; attempt++)
         {
             var candidateId = await dbContext.MatchSeats
-                .Where(s => s.MatchId == matchId &&
+                .Where(s => s.MatchId == matchId && (position == null || s.Position == position) &&
                             (s.Status == SeatStatus.Available || (s.Status == SeatStatus.Held && s.HeldUntilUtc < now)))
-                .OrderBy(s => s.Id)
+                .OrderBy(s => s.Position)
                 .Select(s => s.Id)
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -82,6 +85,23 @@ internal sealed class MatchSeatRepository(PadelMatchDbContext dbContext) : IMatc
 
     public Task<int> CountConfirmedAsync(Guid matchId, CancellationToken cancellationToken) =>
         dbContext.MatchSeats.CountAsync(s => s.MatchId == matchId && s.Status == SeatStatus.Confirmed, cancellationToken);
+
+    public Task<PlayerSeat?> FindActiveSeatAsync(Guid matchId, Guid playerId, DateTimeOffset now, CancellationToken cancellationToken) =>
+        dbContext.MatchSeats
+            .Where(s => s.MatchId == matchId && s.HolderId == playerId &&
+                        (s.Status == SeatStatus.Confirmed || (s.Status == SeatStatus.Held && s.HeldUntilUtc >= now)))
+            .Select(s => new PlayerSeat(s.Position, s.Status, s.HeldUntilUtc))
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<ConfirmedPlayer>> GetConfirmedPlayersAsync(Guid matchId, CancellationToken cancellationToken) =>
+        await dbContext.MatchSeats
+            .Where(s => s.MatchId == matchId && s.Status == SeatStatus.Confirmed)
+            // Ordered on an anonymous shape, then projected: EF can't translate an OrderBy over an already-projected
+            // record (same limitation as MatchRepository's feed query).
+            .Join(dbContext.Players, s => s.HolderId, p => (Guid?)p.Id, (s, p) => new { s.Position, p.Id, p.DisplayName, p.Level })
+            .OrderBy(x => x.Position)
+            .Select(x => new ConfirmedPlayer(x.Position, x.Id, x.DisplayName, x.Level))
+            .ToListAsync(cancellationToken);
 
     private static bool IsSeatHolderUniqueViolation(PostgresException ex) =>
         ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.ConstraintName == "IX_MatchSeats_MatchId_HolderId";

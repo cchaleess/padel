@@ -63,6 +63,11 @@ export default function CreateMatchScreen({ route, navigation }: Props) {
         note: note.trim().length > 0 ? note.trim() : null,
       });
       navigation.replace('MatchDetail', { matchId: created.id });
+      // The organizer's seat is born Held: go straight to paying it, with the detail underneath so leaving the
+      // payment screen lands there (m5-mobile-confirmation design.md).
+      if (created.mySeat?.status === 'Held' && created.mySeat.heldUntilUtc) {
+        navigation.navigate('SeatPayment', { matchId: created.id, heldUntilUtc: created.mySeat.heldUntilUtc });
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se ha podido crear el partido.');
     } finally {

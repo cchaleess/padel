@@ -10,7 +10,7 @@ public sealed class MatchFeedService(
     public async Task<MatchFeed> GetFeedAsync(
         Guid playerId, double? latitude, double? longitude, string? cityOrZoneOverride, CancellationToken cancellationToken)
     {
-        var matches = await matchRepository.FindOpenUpcomingAsync(clock.GetUtcNow(), cancellationToken);
+        var matches = await matchRepository.FindJoinableUpcomingAsync(playerId, clock.GetUtcNow(), cancellationToken);
         var player = await playerRepository.FindByIdAsync(playerId, cancellationToken);
 
         var forYou = new List<MatchWithSlotDetails>();
@@ -26,7 +26,12 @@ public sealed class MatchFeedService(
             effectiveCityOrZone = cityOrZoneOverride ?? player?.CityOrZone;
         }
 
+        // The player's own matches (m5-mobile-confirmation): soonest first, already sorted by the repository.
+        var mine = await matchRepository.FindUpcomingConfirmedForPlayerAsync(playerId, clock.GetUtcNow(), cancellationToken);
+
         return new MatchFeed(
+            mine.Where(m => m.Match.Status == MatchStatus.Full).Select(m => new MatchWithDistance(m, DistanceKm: null)).ToList(),
+            mine.Where(m => m.Match.Status == MatchStatus.Open).Select(m => new MatchWithDistance(m, DistanceKm: null)).ToList(),
             Order(forYou, latitude, longitude, effectiveCityOrZone),
             Order(outOfRange, latitude, longitude, effectiveCityOrZone));
     }

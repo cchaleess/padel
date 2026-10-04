@@ -1,12 +1,18 @@
+using PadelMatch.Domain.Matches;
+
 namespace PadelMatch.Application.Matches;
 
 public sealed class MatchSeatService(
     IMatchSeatRepository seatRepository, IMatchRepository matchRepository, TimeProvider clock) : IMatchSeatService
 {
-    private static readonly TimeSpan HoldDuration = TimeSpan.FromMinutes(5);
-
-    public async Task<DateTimeOffset> HoldSeatAsync(Guid matchId, Guid playerId, CancellationToken cancellationToken)
+    public async Task<DateTimeOffset> HoldSeatAsync(
+        Guid matchId, Guid playerId, int? position, CancellationToken cancellationToken)
     {
+        if (position is { } requested && !MatchSeat.IsValidPosition(requested))
+        {
+            throw new ArgumentOutOfRangeException(nameof(position), requested, $"A seat position is 0–{MatchSeat.SeatsPerMatch - 1}.");
+        }
+
         var now = clock.GetUtcNow();
 
         if (await seatRepository.HasActiveSeatAsync(matchId, playerId, now, cancellationToken))
@@ -14,8 +20,8 @@ public sealed class MatchSeatService(
             throw new PlayerAlreadyHasSeatException();
         }
 
-        var heldUntilUtc = now + HoldDuration;
-        if (!await seatRepository.TryHoldAsync(matchId, playerId, heldUntilUtc, now, cancellationToken))
+        var heldUntilUtc = now + MatchSeat.HoldDuration;
+        if (!await seatRepository.TryHoldAsync(matchId, playerId, position, heldUntilUtc, now, cancellationToken))
         {
             throw new SeatUnavailableException();
         }

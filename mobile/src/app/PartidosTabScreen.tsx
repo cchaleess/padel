@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import ClubsStackNavigator from '../features/clubs/ClubsStackNavigator';
 import PartidosStackNavigator from '../features/matches/PartidosStackNavigator';
@@ -6,9 +6,21 @@ import { colors } from '../theme';
 
 type Segment = 'partidos' | 'clubes';
 
+/** Params another tab can pass to land on a given segment. `requestedAt` makes repeated requests distinct, so
+ * the effect below runs even if the same segment is asked for twice. */
+export type PartidosTabParams = { segment?: Segment; requestedAt?: number } | undefined;
+
 /// <summary>Two segments, not a navigation library: see design.md "Alternativas y límites".</summary>
-export default function PartidosTabScreen() {
+export default function PartidosTabScreen({ route }: { route: { params?: PartidosTabParams } }) {
   const [segment, setSegment] = useState<Segment>('partidos');
+  const requestedSegment = route.params?.segment;
+  const requestedAt = route.params?.requestedAt;
+
+  useEffect(() => {
+    if (requestedSegment) {
+      setSegment(requestedSegment);
+    }
+  }, [requestedSegment, requestedAt]);
 
   return (
     <View style={styles.container}>

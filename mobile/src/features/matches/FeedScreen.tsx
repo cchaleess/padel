@@ -1,13 +1,12 @@
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { api } from '../../api/httpClient';
 import type { MatchFeedItem } from '../../api/types';
 import { colors, typography } from '../../theme';
-import { formatSlotSchedule } from '../clubs/slotFormatting';
-import { getMatchTypeLabel } from './matchTypeLabel';
+import MatchSummaryRow from './MatchSummaryRow';
 import type { PartidosStackParamList } from './PartidosStackNavigator';
 
 type Props = NativeStackScreenProps<PartidosStackParamList, 'Feed'>;
@@ -39,6 +38,12 @@ export default function FeedScreen({ navigation }: Props) {
         return;
       }
       const nextSections: Section[] = [];
+      if (feed.confirmed.length > 0) {
+        nextSections.push({ title: 'Tienes estas partidas confirmadas', data: feed.confirmed });
+      }
+      if (feed.pendingConfirmation.length > 0) {
+        nextSections.push({ title: 'Partidas pendientes de confirmación', data: feed.pendingConfirmation });
+      }
       if (feed.forYou.length > 0) {
         nextSections.push({ title: 'Partidos para ti', data: feed.forYou });
       }
@@ -85,14 +90,7 @@ export default function FeedScreen({ navigation }: Props) {
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
         renderSectionHeader={({ section }) => <Text style={styles.sectionTitle}>{section.title}</Text>}
         renderItem={({ item }) => (
-          <Pressable style={styles.row} onPress={() => navigation.navigate('MatchDetail', { matchId: item.id })}>
-            <Text style={styles.rowTitle}>{item.clubName}</Text>
-            <Text style={typography.note}>{formatSlotSchedule(item.startsAt, item.endsAt)}</Text>
-            <Text style={typography.note}>
-              {getMatchTypeLabel(item.type)}
-              {item.type === 'Competitive' ? ` · ${item.minLevel}–${item.maxLevel}` : ''}
-            </Text>
-          </Pressable>
+          <MatchSummaryRow match={item} onPress={() => navigation.navigate('MatchDetail', { matchId: item.id })} />
         )}
         ListEmptyComponent={<Text style={typography.note}>No hay partidos disponibles por ahora.</Text>}
       />
@@ -106,10 +104,4 @@ const styles = StyleSheet.create({
   error: { color: '#B3261E', fontSize: 14, lineHeight: 20, marginBottom: 8 },
   list: { paddingBottom: 32 },
   sectionTitle: { ...typography.note, fontWeight: '700', marginTop: 20, marginBottom: 8 },
-  row: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#E3E0D2',
-    paddingVertical: 14,
-  },
-  rowTitle: { fontSize: 16, fontWeight: '600', color: colors.ink, marginBottom: 2 },
 });

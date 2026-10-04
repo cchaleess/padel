@@ -12,17 +12,23 @@ public static class MatchEndpoints
         var group = app.MapGroup("/api/matches").RequireAuthorization();
 
         group.MapPost("", async Task<Results<Created<MatchDetailResponse>, ProblemHttpResult>> (
-                CreateMatchRequest request, ClaimsPrincipal user,
-                IMatchCreationService creation, IMatchRepository matches, CancellationToken cancellationToken) =>
+                CreateMatchRequest request, ClaimsPrincipal user, IMatchCreationService creation,
+                IMatchRepository matches, IMatchSeatRepository seats, TimeProvider clock, CancellationToken cancellationToken) =>
             {
                 try
                 {
+                    var playerId = GetPlayerId(user);
                     var match = await creation.CreateMatchAsync(
-                        GetPlayerId(user), request.CourtSlotId, request.Type,
+                        playerId, request.CourtSlotId, request.Type,
                         request.MinLevel, request.MaxLevel, request.MinMatchesRequired, request.Note, cancellationToken);
                     var details = await matches.FindDetailsByIdAsync(match.Id, cancellationToken)
                         ?? throw new MatchNotFoundException(match.Id);
-                    return TypedResults.Created($"/api/matches/{match.Id}", MatchDetailResponse.From(details));
+                    // Always null right after creating (creating isn't joining), resolved anyway so the response has
+                    // a single shape (m5-mobile-confirmation design.md).
+                    var mySeat = await seats.FindActiveSeatAsync(match.Id, playerId, clock.GetUtcNow(), cancellationToken);
+                    var confirmedPlayers = await seats.GetConfirmedPlayersAsync(match.Id, cancellationToken);
+                    return TypedResults.Created(
+                        $"/api/matches/{match.Id}", MatchDetailResponse.From(details, mySeat, confirmedPlayers));
                 }
                 catch (CourtSlotNotFoundException ex)
                 {
@@ -51,16 +57,19 @@ public static class MatchEndpoints
                 return TypedResults.Ok(MatchFeedResponse.From(feed));
             })
             .WithName("GetMatchFeed")
-            .WithSummary("Lists open, upcoming matches near the player, grouped into for-you (compatible) and out-of-range.");
+            .WithSummary("The player's feed: their own upcoming matches (confirmed = full, pending confirmation = still open), then joinable matches grouped into for-you (compatible) and out-of-range.");
 
         group.MapGet("/{id:guid}", async Task<Results<Ok<MatchDetailResponse>, ProblemHttpResult>> (
-                Guid id, IMatchRepository matches, CancellationToken cancellationToken) =>
+                Guid id, ClaimsPrincipal user, IMatchRepository matches, IMatchSeatRepository seats,
+                TimeProvider clock, CancellationToken cancellationToken) =>
             {
                 try
                 {
                     var details = await matches.FindDetailsByIdAsync(id, cancellationToken)
                         ?? throw new MatchNotFoundException(id);
-                    return TypedResults.Ok(MatchDetailResponse.From(details));
+                    var mySeat = await seats.FindActiveSeatAsync(id, GetPlayerId(user), clock.GetUtcNow(), cancellationToken);
+                    var confirmedPlayers = await seats.GetConfirmedPlayersAsync(id, cancellationToken);
+                    return TypedResults.Ok(MatchDetailResponse.From(details, mySeat, confirmedPlayers));
                 }
                 catch (MatchNotFoundException ex)
                 {
@@ -68,16 +77,21 @@ public static class MatchEndpoints
                 }
             })
             .WithName("GetMatchDetails")
-            .WithSummary("Returns a match's detail: club, court, schedule, type, and level range/minimum/note when applicable.")
+            .WithSummary("Returns a match's detail: club, court, schedule, type, level range/minimum/note, confirmed seats and players, and the caller's own seat.")
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         group.MapPost("/{id:guid}/hold", async Task<Results<Ok<SeatHoldResponse>, ProblemHttpResult>> (
-                Guid id, ClaimsPrincipal user, IMatchSeatService seats, CancellationToken cancellationToken) =>
+                Guid id, HoldSeatRequest? request, ClaimsPrincipal user, IMatchSeatService seats,
+                CancellationToken cancellationToken) =>
             {
                 try
                 {
-                    var heldUntilUtc = await seats.HoldSeatAsync(id, GetPlayerId(user), cancellationToken);
+                    var heldUntilUtc = await seats.HoldSeatAsync(id, GetPlayerId(user), request?.Position, cancellationToken);
                     return TypedResults.Ok(new SeatHoldResponse(heldUntilUtc));
+                }
+                catch (ArgumentOutOfRangeException ex)
+                {
+                    return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: ex.Message);
                 }
                 catch (PlayerAlreadyHasSeatException ex)
                 {
@@ -89,7 +103,8 @@ public static class MatchEndpoints
                 }
             })
             .WithName("HoldMatchSeat")
-            .WithSummary("Claims one of the match's 4 seats for the authenticated player; held for 5 minutes.")
+            .WithSummary("Claims one of the match's 4 seats for the authenticated player — the given position (0–1 pair A, 2–3 pair B) or any free one; held for 5 minutes.")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapPost("/{id:guid}/confirm", async Task<Results<Ok, ProblemHttpResult>> (

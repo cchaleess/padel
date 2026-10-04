@@ -47,11 +47,13 @@ public sealed class MatchCreationService(
         slot.Book();
 
         await matchRepository.AddMatchAsync(match, cancellationToken);
-        // 4 seats, all Available, created with the Match itself (design.md, "MatchCreationService crea las 4
-        // plazas"): a match always has exactly 4 seats from the moment it exists, none created later.
-        foreach (var _ in Enumerable.Range(0, 4))
+        // 4 seats created with the Match itself (m5-confirmation design.md): a match always has exactly 4 seats
+        // from the moment it exists. The organizer's (position 0, pair A) is born Held, in this same transaction,
+        // so creating leads straight to paying (m5-mobile-confirmation design.md) — still unconfirmed until they pay.
+        await seatRepository.AddSeatAsync(MatchSeat.CreateHeldBy(match.Id, 0, organizerId, clock.GetUtcNow()), cancellationToken);
+        for (var position = 1; position < MatchSeat.SeatsPerMatch; position++)
         {
-            await seatRepository.AddSeatAsync(MatchSeat.CreateAvailable(match.Id), cancellationToken);
+            await seatRepository.AddSeatAsync(MatchSeat.CreateAvailable(match.Id, position), cancellationToken);
         }
         await matchRepository.SaveChangesAsync(cancellationToken);
 

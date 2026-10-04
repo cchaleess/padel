@@ -19,6 +19,9 @@ internal sealed class MatchSeatConfiguration : IEntityTypeConfiguration<MatchSea
 
         builder.HasIndex(s => s.MatchId);
 
+        // Each of the 4 positions (pair A: 0–1, pair B: 2–3) exists exactly once per match.
+        builder.HasIndex(s => new { s.MatchId, s.Position }).IsUnique();
+
         // Backstop against a player ending up with two active seats in the same match under concurrency
         // (design.md, "Backstop de concurrencia: índice único parcial").
         builder.HasIndex(s => new { s.MatchId, s.HolderId })

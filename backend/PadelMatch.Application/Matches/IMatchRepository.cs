@@ -13,8 +13,15 @@ public interface IMatchRepository
     Task AddMatchAsync(Match match, CancellationToken cancellationToken);
 
     /// <summary>Open matches whose slot hasn't started yet (M4 discovery feed, design.md "exclusión de
-    /// expirados").</summary>
-    Task<IReadOnlyList<MatchWithSlotDetails>> FindOpenUpcomingAsync(DateTimeOffset now, CancellationToken cancellationToken);
+    /// expirados") and that have at least one Confirmed seat, excluding those <paramref name="viewerId"/> organized
+    /// or already has an active seat in — the feed only lists matches the viewer can join (m5-mobile-confirmation).</summary>
+    Task<IReadOnlyList<MatchWithSlotDetails>> FindJoinableUpcomingAsync(
+        Guid viewerId, DateTimeOffset now, CancellationToken cancellationToken);
+
+    /// <summary>Matches (Open or Full) whose slot hasn't started yet where the player has a Confirmed seat,
+    /// soonest first — the feed's "confirmed" and "pending confirmation" sections (m5-mobile-confirmation).</summary>
+    Task<IReadOnlyList<MatchWithSlotDetails>> FindUpcomingConfirmedForPlayerAsync(
+        Guid playerId, DateTimeOffset now, CancellationToken cancellationToken);
 
     /// <summary>Flips Open to Full when the 4th seat confirms (design.md, "Open→Full"). A no-op, not an error,
     /// if the match isn't Open anymore — the ExecuteUpdateAsync WHERE clause makes it idempotent.</summary>
@@ -27,4 +34,4 @@ public interface IMatchRepository
 
 public sealed record MatchWithSlotDetails(
     Match Match, Guid ClubId, string ClubName, double? ClubLatitude, double? ClubLongitude, string? ClubCityOrZone,
-    Guid CourtId, string CourtName, DateTimeOffset StartsAt, DateTimeOffset EndsAt);
+    Guid CourtId, string CourtName, DateTimeOffset StartsAt, DateTimeOffset EndsAt, int ConfirmedSeats);

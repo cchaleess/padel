@@ -172,6 +172,8 @@ public sealed class MatchFeedTests : PlayerApiTestBase
         response.EnsureSuccessStatusCode();
         var match = await response.Content.ReadFromJsonAsync<MatchDetailResponse>(JsonOptions);
         Assert.NotNull(match);
+        // The feed only lists matches with a Confirmed seat (m5-mobile-confirmation): the organizer pays theirs.
+        (await Client.PostAsync($"/api/matches/{match.Id}/confirm", null)).EnsureSuccessStatusCode();
         return match;
     }
 
