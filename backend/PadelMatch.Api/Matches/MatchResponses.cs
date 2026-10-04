@@ -81,7 +81,8 @@ public sealed record AccessRequesterResponse(Guid PlayerId, string DisplayName, 
 public sealed record AccessVoteResponse(AccessRequestStatus Status);
 
 public sealed record ActivityResponse(
-    IReadOnlyList<RequestToVoteResponse> ToVote, IReadOnlyList<OwnRequestResponse> MyRequests)
+    IReadOnlyList<RequestToVoteResponse> ToVote,
+    IReadOnlyList<OwnRequestResponse> MyRequests)
 {
     public static ActivityResponse From(AccessActivity activity) => new(
         activity.ToVote.Select(t => new RequestToVoteResponse(

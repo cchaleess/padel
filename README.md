@@ -180,6 +180,14 @@ GET  /api/activity                                             [autenticado] →
 - `MatchesPlayed` vale 0 hasta M10 (resultados), así que un competitivo con mínimo de partidos exige solicitud a todo el mundo por ahora.
 - La solicitud guarda la plaza desde la que se pidió (`{ position }`), sin reservarla. Si el partido se completa mientras está pendiente, pasa a `Expired`.
 
+## Abandonar un partido (M7)
+
+Un confirmado puede abandonar su plaza mientras el partido **no esté cerrado** (las 4 plazas pagadas) y antes del inicio. La plaza vuelve a estar libre para cualquiera. Con el partido completo no se puede abandonar desde la app; las políticas de cancelación y devolución están pendientes. Si abandona el organizador, el rol pasa al confirmado más antiguo. No hay lista de espera: se descartó siguiendo el modelo de Playtomic. Ver [proposal.md](specs/m7-leave-match/proposal.md).
+
+```text
+POST /api/matches/{id}/leave   [confirmado] → 200
+```
+
 ## Simular otros jugadores (solo desarrollo)
 
 Casi todo lo que se prueba desde M5 necesita que *otro* jugador actúe. Con la API en `Development` existe `POST /api/dev/session { name }`, que entra como un jugador ficticio (se crea la primera vez y se reutiliza por nombre). Fuera de `Development` la ruta no existe. Ver [specs/dev-player-simulation](specs/dev-player-simulation/design.md).

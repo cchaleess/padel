@@ -95,6 +95,36 @@ public sealed class MatchAccessService(
         return request.Status;
     }
 
+    public async Task ReevaluatePendingRequestsAsync(Guid matchId, CancellationToken cancellationToken)
+    {
+        foreach (var pending in await accessRepository.GetPendingRequestsAsync(matchId, cancellationToken))
+        {
+            await using var transaction = await accessRepository.BeginTransactionAsync(cancellationToken);
+            var request = await accessRepository.FindRequestForUpdateAsync(matchId, pending.Requester.PlayerId, cancellationToken);
+            if (request is not { Status: AccessRequestStatus.Pending })
+            {
+                continue;
+            }
+
+            var confirmedIds = (await seatRepository.GetConfirmedPlayersAsync(matchId, cancellationToken))
+                .Select(p => p.PlayerId)
+                .ToHashSet();
+            var approvers = (await accessRepository.GetVotesAsync(request.Id, cancellationToken))
+                .Where(v => v.Approve)
+                .Select(v => v.VoterId)
+                .ToHashSet();
+
+            // Nobody confirmed means nobody to vote: leave it pending rather than approve it by default.
+            if (confirmedIds.Count > 0 && confirmedIds.IsSubsetOf(approvers))
+            {
+                request.Approve(clock.GetUtcNow());
+                await accessRepository.SaveChangesAsync(cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+    }
+
     public async Task<MatchAccessView> GetAccessViewAsync(Match match, Guid viewerId, CancellationToken cancellationToken)
     {
         var viewer = await playerRepository.FindByIdAsync(viewerId, cancellationToken);

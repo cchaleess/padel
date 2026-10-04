@@ -72,7 +72,31 @@ internal sealed class MatchSeatRepository(PadelMatchDbContext dbContext) : IMatc
         await dbContext.MatchSeats
             .Where(s => s.MatchId == matchId && s.HolderId == playerId &&
                         s.Status == SeatStatus.Held && s.HeldUntilUtc >= now)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.Status, SeatStatus.Confirmed), cancellationToken) == 1;
+            .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(s => s.Status, SeatStatus.Confirmed)
+                    .SetProperty(s => s.ConfirmedAtUtc, now),
+                cancellationToken) == 1;
+
+    public async Task<bool> TryLeaveAsync(Guid matchId, Guid playerId, CancellationToken cancellationToken) =>
+        await dbContext.MatchSeats
+            .Where(s => s.MatchId == matchId && s.HolderId == playerId && s.Status == SeatStatus.Confirmed &&
+                        dbContext.Matches.Any(m => m.Id == matchId && m.Status == MatchStatus.Open))
+            .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(s => s.Status, SeatStatus.Available)
+                    .SetProperty(s => s.HolderId, (Guid?)null)
+                    .SetProperty(s => s.HeldUntilUtc, (DateTimeOffset?)null)
+                    .SetProperty(s => s.ConfirmedAtUtc, (DateTimeOffset?)null),
+                cancellationToken) == 1;
+
+    public Task<Guid?> FindEarliestConfirmedAsync(Guid matchId, CancellationToken cancellationToken) =>
+        // Seats confirmed before ConfirmedAtUtc existed have it null: they count as the oldest, by position.
+        dbContext.MatchSeats
+            .Where(s => s.MatchId == matchId && s.Status == SeatStatus.Confirmed)
+            .OrderBy(s => s.ConfirmedAtUtc.HasValue)
+            .ThenBy(s => s.ConfirmedAtUtc)
+            .ThenBy(s => s.Position)
+            .Select(s => s.HolderId)
+            .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<bool> TryReleaseAsync(Guid matchId, Guid playerId, CancellationToken cancellationToken) =>
         await dbContext.MatchSeats

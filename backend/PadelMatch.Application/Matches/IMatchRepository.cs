@@ -27,6 +27,9 @@ public interface IMatchRepository
     /// if the match isn't Open anymore — the ExecuteUpdateAsync WHERE clause makes it idempotent.</summary>
     Task MarkFullAsync(Guid matchId, CancellationToken cancellationToken);
 
+    /// <summary>Hands the organizer role over (plan §18), only if <paramref name="fromId"/> still holds it.</summary>
+    Task TransferOrganizerAsync(Guid matchId, Guid fromId, Guid toId, CancellationToken cancellationToken);
+
     /// <exception cref="CourtSlotUnavailableException">A concurrent request already booked the same CourtSlot
     /// (unique index backstop, design.md "Exclusividad del CourtSlot bajo concurrencia").</exception>
     Task SaveChangesAsync(CancellationToken cancellationToken);

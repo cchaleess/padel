@@ -26,6 +26,14 @@ public interface IMatchSeatRepository
 
     Task<int> CountConfirmedAsync(Guid matchId, CancellationToken cancellationToken);
 
+    /// <summary>Atomically frees the player's own Confirmed seat (plan §23), only while the match is still Open: the
+    /// match's status is checked in the same UPDATE, so a leave can't slip in once the fourth seat has closed it.
+    /// Returns false if they have no Confirmed seat or the match is no longer Open.</summary>
+    Task<bool> TryLeaveAsync(Guid matchId, Guid playerId, CancellationToken cancellationToken);
+
+    /// <summary>The confirmed player who has been in the match the longest (plan §18), or null if nobody is.</summary>
+    Task<Guid?> FindEarliestConfirmedAsync(Guid matchId, CancellationToken cancellationToken);
+
     /// <summary>The player's active seat in this match (same "active" rule as <see cref="HasActiveSeatAsync"/>),
     /// or null — an expired Held counts as no seat, matching what Confirm would do with it.</summary>
     Task<PlayerSeat?> FindActiveSeatAsync(Guid matchId, Guid playerId, DateTimeOffset now, CancellationToken cancellationToken);

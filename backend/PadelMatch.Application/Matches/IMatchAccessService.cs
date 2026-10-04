@@ -20,6 +20,10 @@ public interface IMatchAccessService
     Task<AccessRequestStatus> VoteAsync(
         Guid matchId, Guid requesterId, Guid voterId, bool approve, CancellationToken cancellationToken);
 
+    /// <summary>After a confirmed player leaves (m7-leave-match), the remaining voters may all have approved a pending
+    /// request already: approve those, under the same row lock as a vote.</summary>
+    Task ReevaluatePendingRequestsAsync(Guid matchId, CancellationToken cancellationToken);
+
     /// <summary>What the match detail shows about access: the viewer's own situation, and, if they're a confirmed
     /// player, the pending requests they vote on (other players' requests aren't public).</summary>
     Task<MatchAccessView> GetAccessViewAsync(Match match, Guid viewerId, CancellationToken cancellationToken);

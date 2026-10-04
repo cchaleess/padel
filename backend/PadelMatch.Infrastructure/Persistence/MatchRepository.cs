@@ -46,8 +46,16 @@ internal sealed class MatchRepository(PadelMatchDbContext dbContext) : IMatchRep
 
     public async Task MarkFullAsync(Guid matchId, CancellationToken cancellationToken) =>
         await dbContext.Matches
-            .Where(m => m.Id == matchId && m.Status == MatchStatus.Open)
+            // The count is re-checked in the same statement: a seat left between the caller's count and this UPDATE
+            // must not close a match that only has three confirmed (m7-leave-match).
+            .Where(m => m.Id == matchId && m.Status == MatchStatus.Open &&
+                        dbContext.MatchSeats.Count(s => s.MatchId == matchId && s.Status == SeatStatus.Confirmed) == MatchSeat.SeatsPerMatch)
             .ExecuteUpdateAsync(setters => setters.SetProperty(m => m.Status, MatchStatus.Full), cancellationToken);
+
+    public async Task TransferOrganizerAsync(Guid matchId, Guid fromId, Guid toId, CancellationToken cancellationToken) =>
+        await dbContext.Matches
+            .Where(m => m.Id == matchId && m.OrganizerId == fromId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(m => m.OrganizerId, toId), cancellationToken);
 
     private IQueryable<MatchWithSlotDetails> JoinSlotDetails(IQueryable<Match> matches, DateTimeOffset? startsAtAfter = null) =>
         matches

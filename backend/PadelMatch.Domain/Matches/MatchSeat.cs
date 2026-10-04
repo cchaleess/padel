@@ -21,6 +21,10 @@ public sealed class MatchSeat
     public Guid? HolderId { get; private set; }
     public DateTimeOffset? HeldUntilUtc { get; private set; }
 
+    /// <summary>When the seat was paid; cleared if its player leaves. Picks the next organizer when the current
+    /// one leaves: "el confirmado que lleve más tiempo inscrito" (plan §18, m7-leave-match).</summary>
+    public DateTimeOffset? ConfirmedAtUtc { get; private set; }
+
     private MatchSeat()
     {
     }

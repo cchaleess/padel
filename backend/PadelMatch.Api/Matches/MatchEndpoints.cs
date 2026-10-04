@@ -184,6 +184,7 @@ public static class MatchEndpoints
 
         MapVote(group, "approve", approve: true);
         MapVote(group, "reject", approve: false);
+        MapLeaveEndpoint(group);
     }
 
     /// <summary>Plan §37's route, keyed by the requester: one request per player and match.</summary>
@@ -223,6 +224,29 @@ public static class MatchEndpoints
             .RequireAuthorization()
             .WithName("GetActivity")
             .WithSummary("The player's activity: access requests waiting for their vote, and their own requests.");
+
+    private static void MapLeaveEndpoint(RouteGroupBuilder group) =>
+        group.MapPost("/{id:guid}/leave", async Task<Results<Ok, ProblemHttpResult>> (
+                Guid id, ClaimsPrincipal user, IMatchSeatService seats, CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    await seats.LeaveSeatAsync(id, GetPlayerId(user), cancellationToken);
+                    return TypedResults.Ok();
+                }
+                catch (MatchNotFoundException ex)
+                {
+                    return TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: ex.Message);
+                }
+                catch (Exception ex) when (ex is MatchAlreadyStartedException or MatchClosedException or NoConfirmedSeatException)
+                {
+                    return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message);
+                }
+            })
+            .WithName("LeaveMatch")
+            .WithSummary("Gives up the player's confirmed seat while the match is neither full nor started; if they organized it, the role passes to the longest-confirmed player.")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
     private static Guid GetPlayerId(ClaimsPrincipal user) =>
         Guid.Parse(user.FindFirstValue(JwtRegisteredClaimNames.Sub)

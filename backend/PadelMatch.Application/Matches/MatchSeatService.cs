@@ -7,6 +7,7 @@ public sealed class MatchSeatService(
     IMatchSeatRepository seatRepository,
     IMatchRepository matchRepository,
     IMatchAccessRepository accessRepository,
+    IMatchAccessService accessService,
     IPlayerRepository playerRepository,
     TimeProvider clock) : IMatchSeatService
 {
@@ -75,6 +76,39 @@ public sealed class MatchSeatService(
             // waiting on a vote that can't help them (m6-mobile-quality-rules).
             await accessRepository.ExpirePendingRequestsAsync(matchId, clock.GetUtcNow(), cancellationToken);
         }
+    }
+
+    public async Task LeaveSeatAsync(Guid matchId, Guid playerId, CancellationToken cancellationToken)
+    {
+        var details = await matchRepository.FindDetailsByIdAsync(matchId, cancellationToken)
+            ?? throw new MatchNotFoundException(matchId);
+        if (details.StartsAt <= clock.GetUtcNow())
+        {
+            throw new MatchAlreadyStartedException();
+        }
+
+        // Once all four seats are paid the match is closed and its seats can't be left from the app; cancellation
+        // policies for that case aren't decided yet (m7-leave-match).
+        if (details.Match.Status == MatchStatus.Full)
+        {
+            throw new MatchClosedException();
+        }
+
+        if (!await seatRepository.TryLeaveAsync(matchId, playerId, cancellationToken))
+        {
+            // Either no Confirmed seat, or the match closed between the check above and the UPDATE.
+            throw (await matchRepository.FindByIdAsync(matchId, cancellationToken))?.Status == MatchStatus.Full
+                ? new MatchClosedException()
+                : new NoConfirmedSeatException();
+        }
+
+        if (details.Match.OrganizerId == playerId &&
+            await seatRepository.FindEarliestConfirmedAsync(matchId, cancellationToken) is { } successor)
+        {
+            await matchRepository.TransferOrganizerAsync(matchId, playerId, successor, cancellationToken);
+        }
+
+        await accessService.ReevaluatePendingRequestsAsync(matchId, cancellationToken);
     }
 
     public async Task ReleaseSeatAsync(Guid matchId, Guid playerId, CancellationToken cancellationToken)
