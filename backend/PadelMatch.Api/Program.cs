@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using PadelMatch.Api.Auth;
 using PadelMatch.Api.Clubs;
+using PadelMatch.Api.Dev;
 using PadelMatch.Api.Matches;
 using PadelMatch.Api.Players;
 using PadelMatch.Application;
@@ -58,6 +59,8 @@ app.UseAuthorization();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    // Act as other players while testing locally (specs/dev-player-simulation); never mapped elsewhere.
+    app.MapDevEndpoints();
 
     if (app.Configuration.GetValue("Development:SeedClubs", defaultValue: false))
     {

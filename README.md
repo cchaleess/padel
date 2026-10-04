@@ -164,6 +164,21 @@ POST /api/matches/{id}/release  [autenticado]
 - Retener/confirmar/soltar una plaza que ya no está en el estado esperado (agotadas, caducada reclamada por otro, no es la suya) devuelve 409, no un error genérico.
 - Sin pasarela de pago real todavía (simulado, arquitectura preparada para sustituirlo); sin abandonar una plaza ya `Confirmed` (depende de la lista de espera, M7).
 
+## Simular otros jugadores (solo desarrollo)
+
+Casi todo lo que se prueba desde M5 necesita que *otro* jugador actúe. Con la API en `Development` existe `POST /api/dev/session { name }`, que entra como un jugador ficticio (se crea la primera vez y se reutiliza por nombre). Fuera de `Development` la ruta no existe. Ver [specs/dev-player-simulation](specs/dev-player-simulation/design.md).
+
+`scripts/dev-sim.ps1` la usa para actuar a través de los endpoints reales, sin escribir en la base de datos:
+
+```powershell
+.\scripts\dev-sim.ps1 create-match                 # Ana crea un amistoso en el primer hueco libre y lo paga
+.\scripts\dev-sim.ps1 create-match -Player Carla
+.\scripts\dev-sim.ps1 join <matchId> -Count 2       # 2 jugadores ficticios se unen y pagan
+.\scripts\dev-sim.ps1 hold <matchId> -Player Bruno -Position 2  # retiene la plaza 2 (pareja B) sin pagar (5 min)
+```
+
+En un build de desarrollo de la app, la pantalla de login muestra además «Entrar como jugador de prueba» (Ana, Bruno, Carla) para ver la app desde la perspectiva de otro jugador.
+
 ## Cliente Expo
 
 ```powershell
@@ -254,6 +269,8 @@ No requiere configuración adicional en `mobile/.env`. Sin acción de unirse tod
 ### Confirmación de plaza (M5, development build de Android)
 
 El detalle de un partido muestra «N/4 confirmados» y una acción según tu plaza: «Unirme», «Continuar pago», «Tienes plaza confirmada» o «Partido completo». «Unirme» retiene una plaza y abre la pantalla de pago simulado con una cuenta atrás hasta el vencimiento que fija el servidor. «Pagar» confirma; «Cancelar», el botón atrás o el gesto de volver sueltan la plaza. Al crear un partido, el organizador llega directamente a esa pantalla. Las cards del feed muestran «N/4»; el feed empieza por los partidos propios (confirmados y pendientes de confirmación).
+
+Para probar como otro jugador, usa `scripts/dev-sim.ps1` o el login de prueba (ver «Simular otros jugadores»).
 
 ## Verificación
 

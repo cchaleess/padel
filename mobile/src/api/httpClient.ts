@@ -71,6 +71,13 @@ export const api = {
       body: JSON.stringify({ idToken }),
     }),
 
+  /** Development only: the backend maps this route only in Development (specs/dev-player-simulation). */
+  createDevSession: (name: string) =>
+    request<AuthResponse>('/api/dev/session', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+
   getOwnProfile: () => request<PlayerProfile>('/api/players/me'),
 
   updateOwnProfile: (body: UpdateProfileRequest) =>

@@ -1,7 +1,41 @@
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { colors, typography } from '../../theme';
+import { useAuth } from './AuthContext';
 import { useGoogleSignIn } from './useGoogleSignIn';
+
+const DEV_PLAYERS = ['Ana', 'Bruno', 'Carla'];
+
+/** Development builds only: sign in as a fictional player to see the app as someone else
+ * (specs/dev-player-simulation). The backend route doesn't exist outside Development either. */
+function DevSignIn() {
+  const { signInAsDevPlayer } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <View style={styles.devSection}>
+      <Text style={styles.devTitle}>Desarrollo · entrar como jugador de prueba</Text>
+      <View style={styles.devButtons}>
+        {DEV_PLAYERS.map((name) => (
+          <Pressable
+            key={name}
+            accessibilityRole="button"
+            style={styles.devButton}
+            onPress={() => {
+              setError(null);
+              signInAsDevPlayer(name).catch(() =>
+                setError('No se pudo entrar. ¿Está la API arrancada en Development?'),
+              );
+            }}>
+            <Text style={styles.devButtonLabel}>{name}</Text>
+          </Pressable>
+        ))}
+      </View>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+    </View>
+  );
+}
 
 export default function LoginScreen() {
   const { signIn, isSigningIn, error } = useGoogleSignIn();
@@ -29,6 +63,7 @@ export default function LoginScreen() {
           )}
         </Pressable>
         {error ? <Text style={styles.error}>{error}</Text> : null}
+        {__DEV__ ? <DevSignIn /> : null}
       </View>
     </View>
   );
@@ -55,4 +90,16 @@ const styles = StyleSheet.create({
   googleButtonPressed: { opacity: 0.85 },
   googleButtonLabel: { color: colors.background, fontSize: 17, fontWeight: '700' },
   error: { marginTop: 16, color: '#B3261E', fontSize: 14, lineHeight: 20 },
+  devSection: { marginTop: 40, paddingTop: 20, borderTopWidth: 1, borderTopColor: '#D8D5C4' },
+  devTitle: { ...typography.note, fontSize: 13 },
+  devButtons: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  devButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.brandDark,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  devButtonLabel: { color: colors.brandDark, fontSize: 15, fontWeight: '600' },
 });

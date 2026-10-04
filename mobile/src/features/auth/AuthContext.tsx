@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api } from '../../api/httpClient';
 import { setSessionToken, setUnauthorizedHandler } from '../../api/httpClient';
-import type { PlayerProfile } from '../../api/types';
+import type { AuthResponse, PlayerProfile } from '../../api/types';
 import { clearSession, loadSession, saveSession } from './session';
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
@@ -10,6 +10,8 @@ interface AuthContextValue {
   status: AuthStatus;
   player: PlayerProfile | null;
   signInWithGoogleIdToken: (idToken: string) => Promise<void>;
+  /** Development only: sign in as a fictional player (specs/dev-player-simulation). */
+  signInAsDevPlayer: (name: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -52,16 +54,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
+  const completeSignIn = async ({ sessionToken, player: authenticatedPlayer }: AuthResponse) => {
+    await saveSession(sessionToken);
+    setSessionToken(sessionToken);
+    setPlayer(authenticatedPlayer);
+    setStatus('authenticated');
+  };
+
   const value = useMemo<AuthContextValue>(
     () => ({
       status,
       player,
       signInWithGoogleIdToken: async (idToken: string) => {
-        const { sessionToken, player: authenticatedPlayer } = await api.authenticateWithGoogle(idToken);
-        await saveSession(sessionToken);
-        setSessionToken(sessionToken);
-        setPlayer(authenticatedPlayer);
-        setStatus('authenticated');
+        await completeSignIn(await api.authenticateWithGoogle(idToken));
+      },
+      signInAsDevPlayer: async (name: string) => {
+        await completeSignIn(await api.createDevSession(name));
       },
       signOut: becomeUnauthenticated,
       refreshProfile: async () => {
