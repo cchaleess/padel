@@ -11,10 +11,13 @@ namespace PadelMatch.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, string connectionString, AuthSettings authSettings)
+    /// <param name="commandTimeoutSeconds">EF command timeout. 5 s by default; the test suite raises it, since many
+    /// test classes create and migrate their own database at the same time.</param>
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services, string connectionString, AuthSettings authSettings, int commandTimeoutSeconds = 5)
     {
         services.AddDbContext<PadelMatchDbContext>(options =>
-            options.UseNpgsql(connectionString, postgres => postgres.CommandTimeout(5)));
+            options.UseNpgsql(connectionString, postgres => postgres.CommandTimeout(commandTimeoutSeconds)));
         services.AddScoped<IDatabaseReadiness, DatabaseReadiness>();
         services.AddScoped<IPlayerRepository, PlayerRepository>();
         services.AddScoped<IPlayerAuthenticator, PlayerAuthenticator>();

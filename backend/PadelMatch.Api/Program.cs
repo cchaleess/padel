@@ -28,7 +28,8 @@ var authSettings = new AuthSettings(
     RequireConfigurationValue(builder.Configuration, "Auth:Apple:Audience"),
     RequireConfigurationValue(builder.Configuration, "Auth:SessionSigningKey"));
 
-builder.Services.AddInfrastructure(connectionString, authSettings);
+builder.Services.AddInfrastructure(
+    connectionString, authSettings, builder.Configuration.GetValue("Database:CommandTimeoutSeconds", defaultValue: 5));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
